@@ -23,7 +23,7 @@ except ImportError:
     SEL = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -32,6 +32,7 @@ PLATFORMS = {
     "Prime Video":     "https://www.primevideo.com",
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "Prime Video IT":  "https://www.primevideo.com",
+    "Prime Video BR":  "https://www.primevideo.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -56,6 +57,12 @@ PLATFORM_RULES = {
     "Prime Video IT": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Guarda")]\n//*[@data-testid="play" and contains(.,"Guarda")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video BR": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Assista")]\n//*[@data-testid="play" and contains(.,"Assista")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
