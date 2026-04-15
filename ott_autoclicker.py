@@ -23,7 +23,7 @@ except ImportError:
     SEL = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -31,6 +31,7 @@ UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclick
 PLATFORMS = {
     "Prime Video":     "https://www.primevideo.com",
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
+    "Prime Video IT":  "https://www.primevideo.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -42,13 +43,19 @@ PLATFORMS = {
 PLATFORM_RULES = {
     "Prime Video": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch live")]\n//*[@data-testid="play" and contains(.,"Watch Live")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video USA": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch live")]\n//*[@data-testid="play" and contains(.,"Watch Live")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video IT": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Guarda")]\n//*[@data-testid="play" and contains(.,"Guarda")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -144,7 +151,7 @@ class App:
 
         # platform
         ttk.Label(p, text="Platform:").grid(row=r, column=0, sticky="w", pady=3)
-        self.platform_var = tk.StringVar(value="Prime Video")
+        self.platform_var = tk.StringVar(value="")
         cb = ttk.Combobox(p, textvariable=self.platform_var,
                           values=list(PLATFORMS.keys()), state="readonly", width=16)
         cb.grid(row=r, column=1, sticky="w", padx=8)
@@ -152,7 +159,7 @@ class App:
 
         # url
         ttk.Label(p, text="URL:").grid(row=r, column=0, sticky="w", pady=3)
-        self.url_var = tk.StringVar(value="https://www.primevideo.com")
+        self.url_var = tk.StringVar(value="")
         ttk.Entry(p, textvariable=self.url_var, width=50).grid(
             row=r, column=1, columnspan=3, sticky="ew", padx=8); r += 1
 
@@ -167,11 +174,11 @@ class App:
             row=r, column=0, columnspan=4, sticky="ew", pady=4); r += 1
 
         # click targets
-        ttk.Label(p, text="Click targets\n(one per line):").grid(
-            row=r, column=0, sticky="nw", pady=3)
+        ttk.Label(p, text="Click targets (one per line):").grid(
+            row=r, column=0, columnspan=4, sticky="w", pady=(6,2)); r += 1
         self.targets_text = scrolledtext.ScrolledText(p, width=44, height=5,
                                                        font=MONO_FONT)
-        self.targets_text.grid(row=r, column=1, columnspan=3, sticky="ew", padx=8)
+        self.targets_text.grid(row=r, column=0, columnspan=4, sticky="ew")
         self.targets_text.insert("1.0", "fbl-play-btn\n"); r += 1
 
         # selector type
@@ -246,23 +253,23 @@ class App:
 
         ttk.Label(p, text="Start date:").grid(row=r, column=0, sticky="w", pady=3)
         self.start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
-        ttk.Entry(p, textvariable=self.start_date, width=13).grid(
+        ttk.Entry(p, textvariable=self.start_date, width=11).grid(
             row=r, column=1, sticky="w", padx=8)
         ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
         self.start_time = tk.StringVar(value=now.strftime("%H:%M"))
         st_frame = ttk.Frame(p)
         st_frame.grid(row=r, column=3, sticky="w", padx=8)
-        ttk.Entry(st_frame, textvariable=self.start_time, width=8).pack(side="left")
+        ttk.Entry(st_frame, textvariable=self.start_time, width=6).pack(side="left")
         ttk.Button(st_frame, text="Now", width=4,
                    command=self._set_start_now).pack(side="left", padx=(4, 0)); r += 1
 
         ttk.Label(p, text="End date:").grid(row=r, column=0, sticky="w", pady=3)
         self.end_date = tk.StringVar(value="")
-        ttk.Entry(p, textvariable=self.end_date, width=13).grid(
+        ttk.Entry(p, textvariable=self.end_date, width=11).grid(
             row=r, column=1, sticky="w", padx=8)
         ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
         self.end_time = tk.StringVar(value="")
-        ttk.Entry(p, textvariable=self.end_time, width=8).grid(
+        ttk.Entry(p, textvariable=self.end_time, width=6).grid(
             row=r, column=3, sticky="w", padx=8)
         ttk.Label(p, text="(leave empty = run indefinitely)", foreground="#888888").grid(
             row=r+1, column=1, columnspan=3, sticky="w", padx=8); r += 2
@@ -401,6 +408,7 @@ class App:
                 o.add_argument(f"--user-data-dir={pdir}")
                 o.add_argument("--profile-directory=Default")
                 o.add_argument("--disable-blink-features=AutomationControlled")
+                o.add_argument("--disable-gpu")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 self.driver = (webdriver.Chrome if browser=="Chrome"
