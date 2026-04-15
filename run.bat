@@ -1,2 +1,4 @@
 @echo off
-start pythonw ott_autoclicker.py
+cd /d "%~dp0"
+start "" python ott_autoclicker.py
+exit

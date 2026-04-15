@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
 
 echo Installing dependencies...
 python -m pip install --upgrade pip
-python -m pip install selenium
+python -m pip install selenium webdriver-manager
 echo.
 echo ======================================
 echo   Done! Starting app...

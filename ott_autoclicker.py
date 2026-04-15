@@ -22,8 +22,18 @@ try:
 except ImportError:
     SEL = False
 
+# ── webdriver-manager (optional fallback) ─────────────────────────────────────
+try:
+    from selenium.webdriver.chrome.service import Service as CService
+    from selenium.webdriver.edge.service   import Service as EService
+    from webdriver_manager.chrome import ChromeDriverManager
+    from webdriver_manager.microsoft import EdgeChromiumDriverManager
+    WDM = True
+except ImportError:
+    WDM = False
+
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -33,6 +43,7 @@ PLATFORMS = {
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
+    "Prime Video UK":  "https://www.amazon.co.uk/",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -63,6 +74,12 @@ PLATFORM_RULES = {
     "Prime Video BR": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Assista")]\n//*[@data-testid="play" and contains(.,"Assista")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video UK": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -418,8 +435,18 @@ class App:
                 o.add_argument("--disable-gpu")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
-                self.driver = (webdriver.Chrome if browser=="Chrome"
-                               else webdriver.Edge)(options=o)
+                if browser == "Chrome":
+                    if WDM:
+                        self.driver = webdriver.Chrome(
+                            service=CService(ChromeDriverManager().install()), options=o)
+                    else:
+                        self.driver = webdriver.Chrome(options=o)
+                else:
+                    if WDM:
+                        self.driver = webdriver.Edge(
+                            service=EService(EdgeChromiumDriverManager().install()), options=o)
+                    else:
+                        self.driver = webdriver.Edge(options=o)
                 self.driver.set_window_size(550, 850)
                 self.driver.execute_script(
                     "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
