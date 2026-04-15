@@ -4,6 +4,7 @@ from __future__ import annotations
 import os, sys, platform, time, threading, datetime
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+import urllib.request
 
 # ── selenium (optional) ──────────────────────────────────────────────────────
 try:
@@ -24,8 +25,12 @@ except ImportError:
 IS_MAC  = platform.system() == "Darwin"
 VERSION = "1.0.0"
 
+UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
+UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
+
 PLATFORMS = {
-    "Prime Video": "https://www.primevideo.com",
+    "Prime Video":     "https://www.primevideo.com",
+    "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -35,10 +40,27 @@ PLATFORMS = {
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
+    "Prime Video": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch live")]\n//*[@data-testid="play" and contains(.,"Watch Live")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video USA": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch live")]\n//*[@data-testid="play" and contains(.,"Watch Live")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
     "Disney+": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
         "refresh_first": True,
+    },
+    "TOD": {
+        "selector":      "ID",
+        "targets":       "watch_live_click",
+        "refresh_first": False,
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -89,6 +111,7 @@ class App:
         root.resizable(True, True)
         os.makedirs(PROFILE_DIR, exist_ok=True)
         self._build()
+        threading.Thread(target=self._check_update, daemon=True).start()
 
     # ────────────────────────────────────────────────────────────────────────
     def _build(self):
@@ -218,30 +241,32 @@ class App:
         p = ttk.Frame(parent, padding=12)
         p.pack(fill="both", expand=True)
 
-        now   = datetime.datetime.now()
-        later = now + datetime.timedelta(hours=2)
+        now = datetime.datetime.now()
         r = 0
 
         ttk.Label(p, text="Start date:").grid(row=r, column=0, sticky="w", pady=3)
         self.start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
         ttk.Entry(p, textvariable=self.start_date, width=13).grid(
             row=r, column=1, sticky="w", padx=8)
-        ttk.Label(p, text="Time (HH:MM:SS):").grid(row=r, column=2, sticky="w")
-        self.start_time = tk.StringVar(value=now.strftime("%H:%M:%S"))
+        ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
+        self.start_time = tk.StringVar(value=now.strftime("%H:%M"))
         st_frame = ttk.Frame(p)
         st_frame.grid(row=r, column=3, sticky="w", padx=8)
-        ttk.Entry(st_frame, textvariable=self.start_time, width=11).pack(side="left")
+        ttk.Entry(st_frame, textvariable=self.start_time, width=8).pack(side="left")
         ttk.Button(st_frame, text="Now", width=4,
                    command=self._set_start_now).pack(side="left", padx=(4, 0)); r += 1
 
         ttk.Label(p, text="End date:").grid(row=r, column=0, sticky="w", pady=3)
-        self.end_date = tk.StringVar(value=later.strftime("%Y-%m-%d"))
+        self.end_date = tk.StringVar(value="")
         ttk.Entry(p, textvariable=self.end_date, width=13).grid(
             row=r, column=1, sticky="w", padx=8)
-        ttk.Label(p, text="Time (HH:MM:SS):").grid(row=r, column=2, sticky="w")
-        self.end_time = tk.StringVar(value=later.strftime("%H:%M:%S"))
-        ttk.Entry(p, textvariable=self.end_time, width=11).grid(
-            row=r, column=3, sticky="w", padx=8); r += 1
+        ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
+        self.end_time = tk.StringVar(value="")
+        ttk.Entry(p, textvariable=self.end_time, width=8).grid(
+            row=r, column=3, sticky="w", padx=8)
+        ttk.Label(p, text="(leave empty = run indefinitely)", foreground="#888888").grid(
+            row=r+1, column=1, columnspan=3, sticky="w", padx=8); r += 2
+
 
         ttk.Separator(p, orient="horizontal").grid(
             row=r, column=0, columnspan=4, sticky="ew", pady=6); r += 1
@@ -273,14 +298,39 @@ class App:
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
 
+    # ── auto-update ───────────────────────────────────────────────────────────
+    def _check_update(self):
+        try:
+            with urllib.request.urlopen(UPDATE_VERSION_URL, timeout=5) as r:
+                remote = r.read().decode().strip()
+            if remote != VERSION:
+                self.root.after(0, lambda v=remote: self._prompt_update(v))
+        except Exception:
+            pass  # no internet or server down — silently skip
+
+    def _prompt_update(self, remote_version):
+        if messagebox.askyesno("Update available",
+                f"New version {remote_version} is available (you have {VERSION}).\n\n"
+                "Download and restart now?"):
+            self._do_update()
+
+    def _do_update(self):
+        try:
+            script_path = os.path.abspath(__file__)
+            with urllib.request.urlopen(UPDATE_SCRIPT_URL, timeout=15) as r:
+                new_code = r.read()
+            with open(script_path, "wb") as f:
+                f.write(new_code)
+            messagebox.showinfo("Updated", "Update downloaded. Restarting…")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            messagebox.showerror("Update failed", str(e))
+
     # ── platform change ───────────────────────────────────────────────────────
     def _set_start_now(self):
         n = datetime.datetime.now()
-        e = n + datetime.timedelta(hours=2)
         self.start_date.set(n.strftime("%Y-%m-%d"))
-        self.start_time.set(n.strftime("%H:%M:%S"))
-        self.end_date.set(e.strftime("%Y-%m-%d"))
-        self.end_time.set(e.strftime("%H:%M:%S"))
+        self.start_time.set(n.strftime("%H:%M"))
 
     def _platform_changed(self, _event=None):
         name = self.platform_var.get()
@@ -292,6 +342,8 @@ class App:
             self.targets_text.insert("1.0", rule["targets"])
             if "refresh_first" in rule:
                 self.refresh_first_var.set(rule["refresh_first"])
+            if "click_delay" in rule:
+                self.delay_var.set(rule["click_delay"])
 
     # ── helpers ───────────────────────────────────────────────────────────────
     def _targets(self):
@@ -302,7 +354,9 @@ class App:
         return BY_MAP.get(self.sel_var.get(), By.CLASS_NAME if SEL else None)
 
     def _parse_dt(self, d, t):
-        return datetime.datetime.strptime(f"{d} {t}", "%Y-%m-%d %H:%M:%S")
+        t = t.strip()
+        fmt = "%Y-%m-%d %H:%M:%S" if len(t) == 8 else "%Y-%m-%d %H:%M"
+        return datetime.datetime.strptime(f"{d} {t}", fmt)
 
     def _alive(self):
         if not self.driver: return False
@@ -451,16 +505,23 @@ class App:
             messagebox.showwarning("No targets","Enter at least one selector."); return
         try:
             s_dt = self._parse_dt(self.start_date.get(), self.start_time.get())
-            e_dt = self._parse_dt(self.end_date.get(),   self.end_time.get())
         except ValueError as e:
             messagebox.showerror("Date error",
                 f"Use format YYYY-MM-DD and HH:MM:SS\n{e}"); return
-        if s_dt >= e_dt:
-            messagebox.showerror("Date error","End must be after start."); return
+        e_dt = None
+        if self.end_date.get().strip() and self.end_time.get().strip():
+            try:
+                e_dt = self._parse_dt(self.end_date.get(), self.end_time.get())
+                if s_dt >= e_dt:
+                    messagebox.showerror("Date error", "End must be after start."); return
+            except ValueError as e:
+                messagebox.showerror("Date error",
+                    f"Use format YYYY-MM-DD and HH:MM:SS\n{e}"); return
         self.running = True
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        self.log(f"Monitoring  {s_dt}  →  {e_dt}", "HEAD")
+        end_str = str(e_dt) if e_dt else "indefinitely"
+        self.log(f"Monitoring from {s_dt} → {end_str}", "HEAD")
         self.thread = threading.Thread(target=self._loop,
                                        args=(s_dt, e_dt), daemon=True)
         self.thread.start()
@@ -477,12 +538,12 @@ class App:
             time.sleep(0.1)
         return True
 
-    def _loop(self, s_dt, e_dt):
+    def _loop(self, s_dt, e_dt=None):
         refresh_s     = self.refresh_var.get()
         refresh_first = self.refresh_first_var.get()
         while self.running:
             now = datetime.datetime.now()
-            if now > e_dt:
+            if e_dt and now > e_dt:
                 self.root.after(0, lambda: self.log("Schedule ended.", "OK"))
                 self.root.after(0, self.stop_monitoring); break
             if now < s_dt:
