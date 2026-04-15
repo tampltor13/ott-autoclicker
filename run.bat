@@ -1,2 +1,2 @@
 @echo off
-python ott_autoclicker.py
+start pythonw ott_autoclicker.py
