@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -44,6 +44,7 @@ PLATFORMS = {
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
     "Prime Video UK":  "https://www.amazon.co.uk/",
+    "Prime Video DE":  "https://www.amazon.de/",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -78,6 +79,12 @@ PLATFORM_RULES = {
         "click_delay":   2000,
     },
     "Prime Video UK": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video DE": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
         "refresh_first": True,
