@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -145,7 +145,7 @@ class App:
         self.running = False
         self.thread  = None
         root.title(f"OTT AutoClicker  v{VERSION}")
-        root.geometry("660x640")
+        root.geometry("550x450")
         root.resizable(True, True)
         os.makedirs(PROFILE_DIR, exist_ok=True)
         self._build()
