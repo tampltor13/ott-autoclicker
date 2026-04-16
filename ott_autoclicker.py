@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -145,7 +145,10 @@ class App:
         self.running = False
         self.thread  = None
         root.title(f"OTT AutoClicker  v{VERSION}")
-        root.geometry("660x640")
+        root.geometry("550x350+{}+{}".format(
+            root.winfo_screenwidth() - 580,
+            40
+        ))
         root.resizable(True, True)
         os.makedirs(PROFILE_DIR, exist_ok=True)
         self._build()
@@ -173,19 +176,17 @@ class App:
         p.pack(fill="both", expand=True)
 
         r = 0
-        # browser
+        # browser + platform u istom redu
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
         self.browser_var = tk.StringVar(value="Chrome")
         ttk.Combobox(p, textvariable=self.browser_var,
                      values=["Chrome","Edge"], state="readonly", width=10
-                     ).grid(row=r, column=1, sticky="w", padx=8); r += 1
-
-        # platform
-        ttk.Label(p, text="Platform:").grid(row=r, column=0, sticky="w", pady=3)
+                     ).grid(row=r, column=1, sticky="w", padx=8)
+        ttk.Label(p, text="Platform:").grid(row=r, column=2, sticky="w", pady=3)
         self.platform_var = tk.StringVar(value="")
         cb = ttk.Combobox(p, textvariable=self.platform_var,
-                          values=list(PLATFORMS.keys()), state="readonly", width=16)
-        cb.grid(row=r, column=1, sticky="w", padx=8)
+                          values=list(PLATFORMS.keys()), state="readonly", width=18)
+        cb.grid(row=r, column=3, sticky="w", padx=8)
         cb.bind("<<ComboboxSelected>>", self._platform_changed); r += 1
 
         # url
@@ -199,7 +200,8 @@ class App:
                                     sticky="w", pady=(4,8)); r += 1
         ttk.Button(bf, text="Open Browser",  command=self.open_browser ).pack(side="left", padx=(0,4))
         ttk.Button(bf, text="Navigate →",    command=self.navigate     ).pack(side="left", padx=(0,4))
-        ttk.Button(bf, text="Close Browser", command=self.close_browser).pack(side="left")
+        ttk.Button(bf, text="Close Browser", command=self.close_browser).pack(side="left", padx=(0,4))
+        ttk.Button(bf, text="Test Target",   command=self.test_targets ).pack(side="left")
 
         ttk.Separator(p, orient="horizontal").grid(
             row=r, column=0, columnspan=4, sticky="ew", pady=4); r += 1
@@ -207,7 +209,7 @@ class App:
         # click targets
         ttk.Label(p, text="Click targets (one per line):").grid(
             row=r, column=0, columnspan=4, sticky="w", pady=(6,2)); r += 1
-        self.targets_text = scrolledtext.ScrolledText(p, width=44, height=5,
+        self.targets_text = scrolledtext.ScrolledText(p, width=44, height=3,
                                                        font=MONO_FONT)
         self.targets_text.grid(row=r, column=0, columnspan=4, sticky="ew")
         self.targets_text.insert("1.0", "fbl-play-btn\n"); r += 1
@@ -263,13 +265,6 @@ class App:
         i4.pack(side="left")
         Tooltip(i4, "If checked: refreshes the page first, then looks for the button.\n"
                     "If unchecked: looks for the button first, refreshes at end of cycle."); r += 1
-
-        ttk.Separator(p, orient="horizontal").grid(
-            row=r, column=0, columnspan=4, sticky="ew", pady=6); r += 1
-
-        ttk.Button(p, text="Test — highlight targets in browser",
-                   command=self.test_targets).grid(
-            row=r, column=0, columnspan=4, sticky="w"); r += 1
 
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
