@@ -443,17 +443,17 @@ class App:
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
-                    if WDM:
-                        self.driver = webdriver.Chrome(
-                            service=CService(ChromeDriverManager().install()), options=o)
-                    else:
-                        self.driver = webdriver.Chrome(options=o)
+                    self.driver = webdriver.Chrome(options=o)
                 else:
-                    if WDM:
-                        self.driver = webdriver.Edge(
-                            service=EService(EdgeChromiumDriverManager().install()), options=o)
-                    else:
-                        self.driver = webdriver.Edge(options=o)
+                    edge_paths = [
+                        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                    ]
+                    for ep in edge_paths:
+                        if os.path.exists(ep):
+                            o.binary_location = ep
+                            break
+                    self.driver = webdriver.Edge(options=o)
                 self.driver.set_window_size(550, 850)
                 self.driver.execute_script(
                     "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
