@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -138,6 +138,8 @@ class Tooltip:
             self.win = None
 
 
+PREFS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prefs.json")
+
 class App:
     def __init__(self, root):
         self.root    = root
@@ -145,14 +147,32 @@ class App:
         self.running = False
         self.thread  = None
         root.title(f"OTT AutoClicker  v{VERSION}")
-        root.geometry("550x350+{}+{}".format(
-            root.winfo_screenwidth() - 580,
-            40
-        ))
+        self._load_geometry()
         root.resizable(True, True)
+        root.protocol("WM_DELETE_WINDOW", self._on_close)
         os.makedirs(PROFILE_DIR, exist_ok=True)
         self._build()
         threading.Thread(target=self._check_update, daemon=True).start()
+
+    def _load_geometry(self):
+        try:
+            import json
+            with open(PREFS_FILE) as f:
+                prefs = json.load(f)
+            self.root.geometry(prefs.get("geometry", "600x350+{}+{}".format(
+                self.root.winfo_screenwidth() - 630, 40)))
+        except Exception:
+            self.root.geometry("600x350+{}+{}".format(
+                self.root.winfo_screenwidth() - 630, 40))
+
+    def _on_close(self):
+        try:
+            import json
+            with open(PREFS_FILE, "w") as f:
+                json.dump({"geometry": self.root.geometry()}, f)
+        except Exception:
+            pass
+        self.root.destroy()
 
     # ────────────────────────────────────────────────────────────────────────
     def _build(self):
