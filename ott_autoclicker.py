@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.13"
+VERSION = "1.0.14"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -108,7 +108,7 @@ PLATFORM_RULES = {
         "targets":       "",
         "refresh_first": True,
         "click_delay":   2000,
-        "scroll_after":  180,
+        "scroll_after":  290,
         "load_wait":     10,
     },
     "Paramount+": {
@@ -208,8 +208,10 @@ class App:
 
         t1 = ttk.Frame(nb); nb.add(t1, text="  Setup  ")
         t2 = ttk.Frame(nb); nb.add(t2, text="  Monitor  ")
+        t3 = ttk.Frame(nb); nb.add(t3, text="  Inspector  ")
         self._setup_tab(t1)
         self._monitor_tab(t2)
+        self._inspector_tab(t3)
 
         status_bar = ttk.Frame(self.root, relief="sunken")
         status_bar.pack(fill="x", side="bottom")
@@ -409,6 +411,154 @@ class App:
         p.rowconfigure(r-1, weight=1)
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
+
+    # ── INSPECTOR TAB ────────────────────────────────────────────────────────
+    def _inspector_tab(self, parent):
+        p = ttk.Frame(parent, padding=12)
+        p.pack(fill="both", expand=True)
+
+        self._inspect_active = False
+
+        # top bar
+        bf = ttk.Frame(p); bf.pack(fill="x", pady=(0, 6))
+        self.inspect_btn = ttk.Button(bf, text="▶  Start Inspect Mode",
+                                      command=self._toggle_inspect)
+        self.inspect_btn.pack(side="left", padx=(0, 8))
+        ttk.Button(bf, text="Clear", command=self._clear_inspect).pack(side="left", padx=(0, 4))
+        ttk.Button(bf, text="Save to file", command=self._save_inspect).pack(side="left")
+        self._inspect_status = tk.StringVar(value="Inspect mode OFF — click Start to begin")
+        ttk.Label(bf, textvariable=self._inspect_status,
+                  foreground="#888888").pack(side="left", padx=12)
+
+        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        # log box
+        self._inspect_box = scrolledtext.ScrolledText(p, width=58, height=18,
+                                                       state="disabled", font=MONO_FONT)
+        self._inspect_box.pack(fill="both", expand=True)
+        self._inspect_box.tag_config("HEAD", foreground="purple")
+        self._inspect_box.tag_config("KEY",  foreground="#4fc3f7")
+        self._inspect_box.tag_config("VAL",  foreground="green")
+
+    def _toggle_inspect(self):
+        if not self._alive():
+            messagebox.showwarning("No browser", "Open browser first."); return
+        self._inspect_active = not self._inspect_active
+        if self._inspect_active:
+            self._inject_inspector()
+            self.inspect_btn.config(text="■  Stop Inspect Mode")
+            self._inspect_status.set("Inspect mode ON — click any element in the browser")
+            self._poll_inspect()
+        else:
+            self.inspect_btn.config(text="▶  Start Inspect Mode")
+            self._inspect_status.set("Inspect mode OFF — click Start to begin")
+
+    def _inject_inspector(self):
+        js = """
+(function() {
+    if (window._inspectInstalled) return;
+    window._inspectInstalled = true;
+    window._inspectedElement = null;
+    document.addEventListener('click', function(e) {
+        var el = e.target;
+        var walked = el;
+        for (var i = 0; i < 6; i++) {
+            if (!walked || walked === document.body) break;
+            if (walked.tagName === 'ARTICLE' ||
+                walked.tagName === 'A' ||
+                walked.tagName === 'BUTTON' ||
+                (walked.className && typeof walked.className === 'string' &&
+                 (walked.className.includes('live') || walked.className.includes('play') ||
+                  walked.className.includes('watch') || walked.className.includes('event')))) {
+                el = walked; break;
+            }
+            walked = walked.parentElement;
+        }
+        var info = {
+            tag:     el.tagName,
+            id:      el.id || '',
+            cls:     (typeof el.className === 'string') ? el.className.trim() : '',
+            href:    el.href || el.getAttribute('href') || '',
+            text:    el.innerText ? el.innerText.trim().substring(0, 120) : '',
+            outer:   el.outerHTML ? el.outerHTML.substring(0, 800) : ''
+        };
+        var attrs = {};
+        for (var a = 0; a < el.attributes.length; a++) {
+            var at = el.attributes[a];
+            if (at.name.startsWith('data-')) attrs[at.name] = at.value;
+        }
+        info.data = attrs;
+        window._inspectedElement = info;
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+})();
+"""
+        try:
+            self.driver.execute_script(js)
+        except Exception as e:
+            self._ilog(f"Inject error: {e}")
+
+    def _poll_inspect(self):
+        if not self._inspect_active or not self._alive():
+            return
+        try:
+            info = self.driver.execute_script("return window._inspectedElement")
+            if info:
+                self.driver.execute_script("window._inspectedElement = null")
+                self._log_capture(info)
+        except Exception:
+            pass
+        self.root.after(400, self._poll_inspect)
+
+    def _log_capture(self, info):
+        self._inspect_box.config(state="normal")
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        self._inspect_box.insert("end", f"── [{ts}] {info.get('tag','')} ──\n", "HEAD")
+        for key in ("id", "cls", "href", "text"):
+            val = info.get(key, "").strip()
+            if val:
+                self._inspect_box.insert("end", f"  {key}: ", "KEY")
+                self._inspect_box.insert("end", f"{val}\n", "VAL")
+        for k, v in (info.get("data") or {}).items():
+            self._inspect_box.insert("end", f"  {k}: ", "KEY")
+            self._inspect_box.insert("end", f"{v}\n", "VAL")
+        # suggest XPath
+        cls = info.get("cls", "").strip()
+        tag = info.get("tag", "*").lower()
+        if cls:
+            first_cls = cls.split()[0]
+            xpath = f'//{tag}[contains(@class,"{first_cls}")]'
+            self._inspect_box.insert("end", f"  xpath: ", "KEY")
+            self._inspect_box.insert("end", f"{xpath}\n", "VAL")
+        self._inspect_box.insert("end", "\n")
+        self._inspect_box.see("end")
+        self._inspect_box.config(state="disabled")
+        # store raw for save
+        if not hasattr(self, "_captures"):
+            self._captures = []
+        self._captures.append(info)
+
+    def _ilog(self, msg):
+        self._inspect_box.config(state="normal")
+        self._inspect_box.insert("end", msg + "\n")
+        self._inspect_box.see("end")
+        self._inspect_box.config(state="disabled")
+
+    def _clear_inspect(self):
+        self._inspect_box.config(state="normal")
+        self._inspect_box.delete("1.0", "end")
+        self._inspect_box.config(state="disabled")
+        self._captures = []
+
+    def _save_inspect(self):
+        if not hasattr(self, "_captures") or not self._captures:
+            messagebox.showinfo("Nothing to save", "No captures yet."); return
+        import json
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self._captures, f, indent=2, ensure_ascii=False)
+        messagebox.showinfo("Saved", f"Saved {len(self._captures)} capture(s) to:\n{path}")
 
     # ── auto-update ───────────────────────────────────────────────────────────
     def _check_update(self):
