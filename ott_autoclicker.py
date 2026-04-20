@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.12"
+VERSION = "1.0.13"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -47,12 +47,10 @@ PLATFORMS = {
     "Prime Video DE":  "https://www.amazon.de/",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
+    "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
-    "Netflix":     "https://www.netflix.com",
-    "Max":         "https://www.max.com",
-    "Apple TV+":   "https://tv.apple.com",
     "Custom URL":  "",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
@@ -104,6 +102,14 @@ PLATFORM_RULES = {
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
         "refresh_first": True,
         "click_delay":   2000,
+    },
+    "NBA Docomo": {
+        "selector":      "XPath",
+        "targets":       "",
+        "refresh_first": True,
+        "click_delay":   2000,
+        "scroll_after":  180,
+        "load_wait":     10,
     },
     "Paramount+": {
         "selector":      "XPath",
@@ -326,6 +332,19 @@ class App:
         Tooltip(i4, "If checked: refreshes the page first, then looks for the button.\n"
                     "If unchecked: looks for the button first, refreshes at end of cycle."); r += 1
 
+        # scroll after click
+        ttk.Label(p, text="Scroll after click (px):").grid(row=r, column=0, sticky="w", pady=3)
+        self.scroll_after_var = tk.IntVar(value=0)
+        f_scroll = ttk.Frame(p); f_scroll.grid(row=r, column=1, sticky="w", padx=8)
+        tk.Spinbox(f_scroll, from_=0, to=5000, textvariable=self.scroll_after_var,
+                   width=8, bg="#3c3c3c", fg="#ffffff",
+                   buttonbackground="#555555", insertbackground="#ffffff").pack(side="left")
+        i5 = ttk.Label(f_scroll, text=" ⓘ", foreground="#888888", cursor="hand2")
+        i5.pack(side="left")
+        Tooltip(i5, "Pixels to scroll down after a successful click.\n"
+                    "Use to bring the video player into view.\n"
+                    "0 = no scroll."); r += 1
+
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
 
@@ -438,8 +457,14 @@ class App:
                 self.refresh_first_var.set(rule["refresh_first"])
             if "click_delay" in rule:
                 self.delay_var.set(rule["click_delay"])
-        # TOD and Paramount+ default to Edge (DRM compatibility)
-        if name in ("TOD", "Paramount+"):
+            if "scroll_after" in rule:
+                self.scroll_after_var.set(rule["scroll_after"])
+            else:
+                self.scroll_after_var.set(0)
+            if "load_wait" in rule:
+                self.load_var.set(rule["load_wait"])
+        # TOD, Paramount+ and NBA Docomo default to Edge
+        if name in ("TOD", "Paramount+", "NBA Docomo"):
             self.browser_var.set("Edge")
         # show/hide event keyword field
         if name == "Paramount+":
@@ -619,6 +644,7 @@ class App:
     def _do_clicks(self):
         targets = self._effective_targets(); by = self._by()
         load_s = self.load_var.get(); delay_ms = self.delay_var.get()
+        scroll_px = self.scroll_after_var.get()
         if load_s > 0: time.sleep(load_s)
         ok = 0
         for t in targets:
@@ -626,6 +652,10 @@ class App:
                 el = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((by, t)))
                 el.click(); self.log(f"  ✓  clicked '{t}'", "OK"); ok += 1
+                if scroll_px > 0:
+                    time.sleep(0.5)
+                    self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
+                    self.log(f"  ↓  scrolled {scroll_px}px", "OK")
             except TimeoutException:
                 self.log(f"  ✗  timeout: '{t}'", "WARN")
             except NoSuchElementException:
