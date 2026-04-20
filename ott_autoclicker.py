@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.10"
+VERSION = "1.0.12"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -47,6 +47,7 @@ PLATFORMS = {
     "Prime Video DE":  "https://www.amazon.de/",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
+    "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
     "Netflix":     "https://www.netflix.com",
@@ -101,6 +102,12 @@ PLATFORM_RULES = {
     "Prime Video JP": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Paramount+": {
+        "selector":      "XPath",
+        "targets":       '//article[contains(@class,"live-event")]//a',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -173,10 +180,10 @@ class App:
             import json
             with open(PREFS_FILE) as f:
                 prefs = json.load(f)
-            self.root.geometry(prefs.get("geometry", "600x350+{}+{}".format(
+            self.root.geometry(prefs.get("geometry", "600x400+{}+{}".format(
                 self.root.winfo_screenwidth() - 630, 40)))
         except Exception:
-            self.root.geometry("600x350+{}+{}".format(
+            self.root.geometry("600x400+{}+{}".format(
                 self.root.winfo_screenwidth() - 630, 40))
 
     def _on_close(self):
@@ -247,6 +254,25 @@ class App:
                                                        font=MONO_FONT)
         self.targets_text.grid(row=r, column=0, columnspan=4, sticky="ew")
         self.targets_text.insert("1.0", "fbl-play-btn\n"); r += 1
+
+        # event keyword filter (shown only for Paramount+)
+        self._kw_row = r
+        self._kw_label = ttk.Label(p, text="Event keyword:")
+        self._kw_label.grid(row=r, column=0, sticky="w", pady=3)
+        self.event_kw_var = tk.StringVar(value="")
+        self._kw_frame = ttk.Frame(p)
+        self._kw_frame.grid(row=r, column=1, columnspan=3, sticky="ew", padx=8)
+        ttk.Entry(self._kw_frame, textvariable=self.event_kw_var, width=30).pack(side="left")
+        i_kw = ttk.Label(self._kw_frame, text=" ⓘ", foreground="#888888", cursor="hand2")
+        i_kw.pack(side="left")
+        Tooltip(i_kw, "Filter which event card to click by name.\n"
+                      "e.g. 'Vissel Kobe' — clicks only the card that contains\n"
+                      "that text. Leave empty to click the first live event.")
+        self._kw_label.grid_remove()
+        self._kw_frame.grid_remove()
+        self.event_kw_var.trace_add("write", self._on_kw_changed)
+        self._base_targets = ""
+        r += 1
 
         # selector type
         ttk.Label(p, text="Selector:").grid(row=r, column=0, sticky="w", pady=3)
@@ -405,17 +431,57 @@ class App:
         rule = PLATFORM_RULES.get(name)
         if rule:
             self.sel_var.set(rule["selector"])
+            self._base_targets = rule["targets"]
             self.targets_text.delete("1.0", "end")
             self.targets_text.insert("1.0", rule["targets"])
             if "refresh_first" in rule:
                 self.refresh_first_var.set(rule["refresh_first"])
             if "click_delay" in rule:
                 self.delay_var.set(rule["click_delay"])
+        # TOD and Paramount+ default to Edge (DRM compatibility)
+        if name in ("TOD", "Paramount+"):
+            self.browser_var.set("Edge")
+        # show/hide event keyword field
+        if name == "Paramount+":
+            self._kw_label.grid()
+            self._kw_frame.grid()
+        else:
+            self.event_kw_var.set("")
+            self._kw_label.grid_remove()
+            self._kw_frame.grid_remove()
+
+    def _on_kw_changed(self, *_):
+        """Live-update targets_text when event keyword changes."""
+        kw = self.event_kw_var.get().strip()
+        base = self._base_targets
+        if not base:
+            return
+        if kw:
+            lines = []
+            for t in base.splitlines():
+                t = t.strip()
+                if not t:
+                    continue
+                idx = t.find("]")
+                if idx != -1:
+                    t = t[:idx] + f" and contains(.,'{kw}')" + t[idx:]
+                else:
+                    t = t + f"[contains(.,'{kw}')]"
+                lines.append(t)
+            effective = "\n".join(lines)
+        else:
+            effective = base
+        self.targets_text.delete("1.0", "end")
+        self.targets_text.insert("1.0", effective)
 
     # ── helpers ───────────────────────────────────────────────────────────────
     def _targets(self):
         return [l.strip() for l in
                 self.targets_text.get("1.0","end").splitlines() if l.strip()]
+
+    def _effective_targets(self):
+        """Returns targets as shown in targets_text (already includes keyword if set)."""
+        return self._targets()
 
     def _by(self):
         return BY_MAP.get(self.sel_var.get(), By.CLASS_NAME if SEL else None)
@@ -522,11 +588,14 @@ class App:
     def test_targets(self):
         if not self._alive():
             messagebox.showwarning("No browser","Open the browser and navigate first."); return
-        targets = self._targets()
+        targets = self._effective_targets()
         if not targets:
             messagebox.showwarning("No targets","Enter at least one selector."); return
         by = self._by()
         self.log("=== TEST ===", "HEAD")
+        kw = self.event_kw_var.get().strip() if hasattr(self, "event_kw_var") else ""
+        if kw:
+            self.log(f"  Event keyword filter: '{kw}'")
         found = 0
         for t in targets:
             try:
@@ -548,7 +617,7 @@ class App:
 
     # ── click / refresh ───────────────────────────────────────────────────────
     def _do_clicks(self):
-        targets = self._targets(); by = self._by()
+        targets = self._effective_targets(); by = self._by()
         load_s = self.load_var.get(); delay_ms = self.delay_var.get()
         if load_s > 0: time.sleep(load_s)
         ok = 0
