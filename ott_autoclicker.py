@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.18"
+VERSION = "1.0.19"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -47,6 +47,7 @@ PLATFORMS = {
     "Prime Video DE":  "https://www.amazon.de/",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
+    "Prime Video MX": "https://www.primevideo.com",
     "Coupang Play": "https://www.coupangplay.com",
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
@@ -79,7 +80,7 @@ PLATFORM_RULES = {
     },
     "Prime Video BR": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Assista")]\n//*[@data-testid="play" and contains(.,"Assista")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Assistir")]\n//*[@data-testid="play" and contains(.,"Assistir")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -104,6 +105,12 @@ PLATFORM_RULES = {
     "Prime Video JP": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video MX": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Ver")]\n//*[@data-testid="play" and contains(.,"Ver")]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -650,7 +657,7 @@ class App:
             if "load_wait" in rule:
                 self.load_var.set(rule["load_wait"])
         # TOD, Paramount+, NBA Docomo and Disney+ SE default to Edge
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX"):
             self.browser_var.set("Edge")
         # show/hide event keyword field
         if name == "Paramount+":
