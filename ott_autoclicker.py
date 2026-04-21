@@ -47,10 +47,12 @@ PLATFORMS = {
     "Prime Video DE":  "https://www.amazon.de/",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
+    "Coupang Play": "https://www.coupangplay.com",
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
+    "Disney+ Edge": "https://www.disneyplus.com/home",
     "Custom URL":  "",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
@@ -103,6 +105,12 @@ PLATFORM_RULES = {
         "refresh_first": True,
         "click_delay":   2000,
     },
+    "Coupang Play": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-cy="playCtaButtonText"]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
     "NBA Docomo": {
         "selector":      "XPath",
         "targets":       "",
@@ -118,6 +126,11 @@ PLATFORM_RULES = {
         "click_delay":   2000,
     },
     "Disney+": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "refresh_first": True,
+    },
+    "Disney+ Edge": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
         "refresh_first": True,
@@ -489,8 +502,6 @@ class App:
         }
         info.data = attrs;
         window._inspectedElement = info;
-        e.preventDefault();
-        e.stopPropagation();
     }, true);
 })();
 """
@@ -503,6 +514,9 @@ class App:
         if not self._inspect_active or not self._alive():
             return
         try:
+            installed = self.driver.execute_script("return !!window._inspectInstalled")
+            if not installed:
+                self._inject_inspector()
             info = self.driver.execute_script("return window._inspectedElement")
             if info:
                 self.driver.execute_script("window._inspectedElement = null")
@@ -613,8 +627,8 @@ class App:
                 self.scroll_after_var.set(0)
             if "load_wait" in rule:
                 self.load_var.set(rule["load_wait"])
-        # TOD, Paramount+ and NBA Docomo default to Edge
-        if name in ("TOD", "Paramount+", "NBA Docomo"):
+        # TOD, Paramount+, NBA Docomo and Disney+ Edge default to Edge
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ Edge"):
             self.browser_var.set("Edge")
         # show/hide event keyword field
         if name == "Paramount+":
