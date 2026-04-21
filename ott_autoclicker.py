@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.14"
+VERSION = "1.0.15"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -52,7 +52,8 @@ PLATFORMS = {
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
-    "Disney+ Edge": "https://www.disneyplus.com/home",
+    "Disney+ SE": "https://www.disneyplus.com/home",
+    "Disney+ DK": "https://www.disneyplus.com/home",
     "Custom URL":  "",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
@@ -130,7 +131,12 @@ PLATFORM_RULES = {
         "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
         "refresh_first": True,
     },
-    "Disney+ Edge": {
+    "Disney+ SE": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "refresh_first": True,
+    },
+    "Disney+ DK": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
         "refresh_first": True,
@@ -627,8 +633,8 @@ class App:
                 self.scroll_after_var.set(0)
             if "load_wait" in rule:
                 self.load_var.set(rule["load_wait"])
-        # TOD, Paramount+, NBA Docomo and Disney+ Edge default to Edge
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ Edge"):
+        # TOD, Paramount+, NBA Docomo and Disney+ SE default to Edge
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK"):
             self.browser_var.set("Edge")
         # show/hide event keyword field
         if name == "Paramount+":
