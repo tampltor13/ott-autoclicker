@@ -122,7 +122,7 @@ PLATFORM_RULES = {
     },
     "NBA Docomo": {
         "selector":      "XPath",
-        "targets":       "",
+        "targets":       '//*[@data-src="/assets/icon/play.svg"]',
         "refresh_first": True,
         "click_delay":   2000,
         "scroll_after":  290,
