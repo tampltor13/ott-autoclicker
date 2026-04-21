@@ -54,6 +54,7 @@ PLATFORMS = {
     "Disney+":     "https://www.disneyplus.com/home",
     "Disney+ SE": "https://www.disneyplus.com/home",
     "Disney+ DK": "https://www.disneyplus.com/home",
+    "Disney+ AR": "https://www.disneyplus.com/home",
     "Custom URL":  "",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
@@ -137,6 +138,11 @@ PLATFORM_RULES = {
         "refresh_first": True,
     },
     "Disney+ DK": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "refresh_first": True,
+    },
+    "Disney+ AR": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
         "refresh_first": True,
