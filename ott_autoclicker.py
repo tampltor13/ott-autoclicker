@@ -33,13 +33,13 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.16"
+VERSION = "1.0.18"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
 
 PLATFORMS = {
-    "Prime Video":     "https://www.primevideo.com",
+    "Amazon Prime US": "https://www.primevideo.com",
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
@@ -59,7 +59,7 @@ PLATFORMS = {
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
-    "Prime Video": {
+    "Amazon Prime US": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
         "refresh_first": True,
@@ -146,6 +146,7 @@ PLATFORM_RULES = {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
+        "load_wait":     10,
     },
     "TOD": {
         "selector":      "ID",
@@ -254,13 +255,22 @@ class App:
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
         self.browser_var = tk.StringVar(value="Chrome")
         ttk.Combobox(p, textvariable=self.browser_var,
-                     values=["Chrome","Edge"], state="readonly", width=10
+                     values=["Chrome","Edge"], state="readonly", width=14
                      ).grid(row=r, column=1, sticky="w", padx=8)
-        ttk.Label(p, text="Platform:").grid(row=r, column=2, sticky="w", pady=3)
+        self.sys_profile_var = tk.BooleanVar(value=False)
+        sp_cb = ttk.Checkbutton(p, text="Use system profile", variable=self.sys_profile_var)
+        sp_cb.grid(row=r, column=2, sticky="w", pady=3)
+        i_sp = ttk.Label(p, text=" ⓘ", foreground="#888888", cursor="hand2")
+        i_sp.grid(row=r, column=3, sticky="w")
+        Tooltip(i_sp, "Use your real Chrome/Edge profile (already logged in).\n"
+                      "Close the browser before opening it here.\n"
+                      "Default (unchecked) uses the separate AutoClicker profile."); r += 1
+
+        ttk.Label(p, text="Platform:").grid(row=r, column=0, sticky="w", pady=3)
         self.platform_var = tk.StringVar(value="")
         cb = ttk.Combobox(p, textvariable=self.platform_var,
-                          values=list(PLATFORMS.keys()), state="readonly", width=18)
-        cb.grid(row=r, column=3, sticky="w", padx=8)
+                          values=list(PLATFORMS.keys()), state="readonly", width=22)
+        cb.grid(row=r, column=1, columnspan=3, sticky="w", padx=8)
         cb.bind("<<ComboboxSelected>>", self._platform_changed); r += 1
 
         # url
@@ -719,12 +729,20 @@ class App:
         if self._alive():
             self.log("Browser already open. Use Navigate.", "WARN"); return
 
-        browser = self.browser_var.get()
-        url     = self.url_var.get().strip()
-        pdir    = os.path.join(PROFILE_DIR, f"{browser.lower()}_profile")
-        os.makedirs(pdir, exist_ok=True)
+        browser    = self.browser_var.get()
+        url        = self.url_var.get().strip()
+        use_sys    = self.sys_profile_var.get()
+        localappdata = os.environ.get("LOCALAPPDATA", "")
+        if use_sys:
+            if browser == "Chrome":
+                pdir = os.path.join(localappdata, "Google", "Chrome", "User Data")
+            else:
+                pdir = os.path.join(localappdata, "Microsoft", "Edge", "User Data")
+        else:
+            pdir = os.path.join(PROFILE_DIR, f"{browser.lower()}_profile")
+            os.makedirs(pdir, exist_ok=True)
         self._set_status(f"Opening {browser}…")
-        self.log(f"Opening {browser}  |  profile: {pdir}")
+        self.log(f"Opening {browser}  |  {'system' if use_sys else 'autoclicker'} profile: {pdir}")
 
         def _go():
             try:
