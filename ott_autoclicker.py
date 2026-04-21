@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.15"
+VERSION = "1.0.16"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -129,22 +129,22 @@ PLATFORM_RULES = {
     },
     "Disney+": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "targets":       '//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ SE": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "targets":       '//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ DK": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "targets":       '//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ AR": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button" and contains(.,"CONTINUE")]',
+        "targets":       '//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "TOD": {
