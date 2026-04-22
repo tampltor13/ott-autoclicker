@@ -1,4 +1,4 @@
-#\!/usr/bin/env python3
+#!/usr/bin/env python3
 """OTT AutoClicker – compatible with Python 3.9 / macOS system Tk"""
 from __future__ import annotations
 import os, sys, platform, time, threading, datetime
@@ -33,7 +33,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.19"
+VERSION = "1.0.20"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -136,22 +136,22 @@ PLATFORM_RULES = {
     },
     "Disney+": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ SE": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ DK": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
     },
     "Disney+ AR": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
         "refresh_first": True,
         "load_wait":     10,
     },
@@ -656,6 +656,8 @@ class App:
                 self.scroll_after_var.set(0)
             if "load_wait" in rule:
                 self.load_var.set(rule["load_wait"])
+            else:
+                self.load_var.set(5)
         # TOD, Paramount+, NBA Docomo and Disney+ SE default to Edge
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX"):
             self.browser_var.set("Edge")
