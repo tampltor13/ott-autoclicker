@@ -1,0 +1,203 @@
+OTT AutoClicker — Changelog
+===========================
+
+
+v1.0.1 — Initial release
+--------------------------
+- Basic tkinter GUI with Setup and Monitor tabs
+- Selenium 4 with Chrome support
+- Persistent Chrome profile via --user-data-dir
+- XPath, CSS Selector, ID, Class Name selector types
+- Click targets (one per line)
+- Start/stop monitoring with scheduled start time
+- Timestamped log with color-coded entries
+- Prime Video as first supported platform
+
+
+v1.0.2 — Prime Video BR + multi-region base
+--------------------------------------------
+- Added Prime Video BR (keyword: Assista)
+- Added Prime Video IT (keyword: Guarda)
+- Added Prime Video USA (amazon.com/gp/video/sports)
+- Added Prime Video UK (amazon.co.uk)
+- Added Prime Video DE (amazon.de)
+- Added Prime Video ES
+
+
+v1.0.3 — TOD + Disney+
+------------------------
+- Added TOD platform (selector: ID, target: watch_live_click)
+- Added Disney+ platform (data-testid="playback-action-button")
+- Refresh before click: disabled by default for TOD, enabled for Prime Video and Disney+
+
+
+v1.0.4 — Edge browser support
+-------------------------------
+- Added Microsoft Edge as browser option alongside Chrome
+- Edge binary auto-detected at known Windows paths
+- Separate edge_profile folder for persistent Edge sessions
+- Fixed webdriver-manager conflict with Edge — now uses Selenium Manager directly
+
+
+v1.0.5 — Auto-update system
+-----------------------------
+- App checks GitHub on every startup for new version
+- Fetches version.txt from GitHub raw URL
+- Prompts user with Yes/No dialog if update available
+- Downloads new ott_autoclicker.py and restarts via os.execv
+- SSL certificate verification bypassed (ssl.CERT_NONE) for compatibility
+- UPDATE_VERSION_URL and UPDATE_SCRIPT_URL constants added
+
+
+v1.0.6 — UI improvements + tooltips
+--------------------------------------
+- Added Click delay (ms) spinbox with tooltip
+- Added Page-load wait (s) spinbox with tooltip
+- Added Refresh every (s) spinbox
+- Added Refresh BEFORE clicking checkbox with tooltip
+- Info icons (ⓘ) with dark tooltip popups for all settings
+- Browser + Platform moved to same row to save space
+- URL field spans full width
+- Test Target button added next to Close Browser
+- Click targets textarea height reduced to 3 lines
+
+
+v1.0.7 — Monitoring fixes
+---------------------------
+- Fixed: refresh was not actually working (was using send_keys Cmd+R, now uses driver.refresh())
+- Fixed: monitoring continued after successful click — now stops immediately when ok > 0
+- End time field: leave empty to run indefinitely
+- Removed seconds display from time fields
+
+
+v1.0.8 — Windows deployment
+-----------------------------
+- Added install.bat: checks for Python, downloads installer via curl if missing, installs selenium
+- Added run.vbs: launches app silently via WScript.Shell without terminal window
+- Fixed: pythonw not on PATH issue in VBS — switched to plain python
+- Platform default changed to empty (no platform selected on startup)
+- Window geometry: 600x350, positioned top-right corner of screen
+
+
+v1.0.9 — Prime Video JP + window polish
+-----------------------------------------
+- Added Prime Video JP (amazon.co.jp, keyword: Watch)
+- Window geometry persistence: saves/restores position via prefs.json
+- Window default position: top-right corner (screenwidth - 630, y=40)
+
+
+v1.0.10 — Version bump
+------------------------
+- Version bump for Prime Video JP release
+- version.txt updated for auto-update distribution
+
+
+v1.0.11 — Paramount+ + Event keyword + Edge defaults
+------------------------------------------------------
+- Added Paramount+ platform (paramountplus.com, Edge default)
+- Added Event keyword field: filters which event card to click by name (e.g. "Vissel Kobe")
+- Event keyword only visible when Paramount+ is selected (hidden for all other platforms)
+- Event keyword live-updates XPath in targets field as you type
+- Base targets stored per platform; keyword injected at runtime into XPath predicate
+- TOD and Paramount+ now default to Edge browser on platform select
+- Removed Apple TV+, Max, Netflix from platform list
+
+
+v1.0.12 — Event keyword polish
+--------------------------------
+- Event keyword field hidden/shown dynamically on platform change
+- Switching away from Paramount+ clears and hides keyword field
+- XPath in targets field updates in real time as keyword is typed
+- _effective_targets() simplified: reads directly from targets_text (already contains keyword)
+
+
+v1.0.13 — NBA Docomo + Scroll after click + Coupang Play
+----------------------------------------------------------
+- Added NBA Docomo platform (nba.docomo.ne.jp/schedule, Edge default)
+  - Page-load wait: 10 seconds default
+  - Scroll after click: 290px (uses document.body.scrollBy, not window.scrollBy)
+  - Click delay: 2000ms
+- Added Coupang Play platform (coupangplay.com, Chrome default)
+  - Selector: //*[@data-cy="playCtaButtonText"]
+- Added Scroll after click (px) field to Setup tab
+  - Scrolls page down after successful click using document.body.scrollBy
+  - 0 = disabled (default for all platforms except NBA Docomo)
+- Added load_wait per platform rule (page-load wait loaded from PLATFORM_RULES)
+- scroll_after and load_wait applied automatically on platform select
+
+
+v1.0.14 — Inspector tab + launcher exe
+----------------------------------------
+- Added Inspector tab (third tab, after Monitor)
+  - Start/Stop Inspect Mode button
+  - Injects JS click listener into open browser page
+  - Captures: tag, classes, href, text, data-* attributes, suggested XPath
+  - Walks up DOM tree to find meaningful parent element (article, a, button, live/play/watch/event classes)
+  - Displays captures in scrollable log with color-coded keys/values
+  - Auto re-injects after page refresh or navigation
+  - Clear button clears capture log
+  - Save to file exports all captures to captures.json
+  - Fixed: removed preventDefault/stopPropagation so browser navigation still works
+- Added AutoClicker.exe via PyInstaller (launcher only, never changes)
+- Added build_launcher.bat: builds AutoClicker.exe on Windows with favicon.ico
+- Added launcher.py: minimal script that runs ott_autoclicker.py via pythonw
+- Added favicon.ico as app icon
+- Added Disney+ SE (same selectors as Disney+, Edge default — Sweden account)
+- Window height increased to 600x400
+
+
+v1.0.15 — Rollback base + Disney+ DK
+---------------------------------------
+- Rolled back to stable base (v1.0.14 backup from GitHub)
+- Renamed Disney+ Edge to Disney+ SE
+- Added Disney+ DK (Denmark account, Edge default, same selectors)
+- All Disney+ variants: Edge default for SE and DK, Chrome for Disney+ and AR
+
+
+v1.0.16 — Disney+ AR + selector fix
+--------------------------------------
+- Added Disney+ AR (Argentina account, Chrome default)
+- Fixed Disney+ selector: removed contains(.,"CONTINUE") text filter
+  - Now uses //*[@data-testid="playback-action-button"] only
+  - Works for both "CONTINUE" and "WATCH LIVE" button states
+  - Applied to all Disney+ variants (Disney+, SE, DK, AR)
+
+v1.0.17 — Use system profile option
+--------------------------------------
+- Added "Use system profile" checkbox in Setup tab (next to Browser dropdown)
+- When checked: Selenium uses the real Chrome/Edge User Data profile (already logged in)
+- When unchecked (default): uses browser_profiles/ folder as before — no change to existing behavior
+- Useful when profile copy doesn't transfer login sessions correctly
+- Warning: close regular browser before using system profile in Selenium
+
+
+v1.0.18 — Platform dropdown fixes + Amazon Prime US rename
+-----------------------------------------------------------
+- Renamed "Prime Video" to "Amazon Prime US"
+- Fixed Platform combobox alignment: was pushed far right (column 3), now aligned left like Browser and URL
+- Browser dropdown made slightly wider (width 14)
+- Platform combobox now allows typing/filtering (no longer strictly readonly)
+- Disney+ AR: default page-load wait set to 10s
+
+
+v1.0.20 — Disney+ modal selector + load_wait bug fix
+------------------------------------------------------
+- All Disney+ variants (Disney+, SE, DK, AR): added modal-action-button
+  as first target, playback-action-button as fallback
+  - Handles popup ("Watch Live / Watch from Beginning") that appears
+    when not entering live immediately; modal click is harmless if absent
+- Fixed bug: switching away from Disney+ AR (load_wait 10s) to another
+  platform no longer keeps the 10s page-load wait — resets to 5s default
+
+
+v1.0.21 — JS click fallback + NBA Docomo space-key playback
+------------------------------------------------------------
+- JS click fallback: when Selenium can't click due to overlapping element
+  (ElementClickInterceptedException), automatically retries via JavaScript
+  click which bypasses visual interception — works for all platforms
+- NBA Docomo playback sequence overhauled:
+  - Selector changed to //video-js[contains(@class,"video-js")] (VideoJS container)
+  - Sequence: refresh → 10s load wait → scroll 290px → click video-js (focus) → space key
+  - Scroll now happens BEFORE click when key_press is configured
+  - Space key triggers live playback after video player has focus
+- key_press field added to platform rules (drives post-click keyboard input)
