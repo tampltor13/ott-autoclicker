@@ -17,7 +17,9 @@ try:
     from selenium.webdriver.support       import expected_conditions as EC
     from selenium.common.exceptions       import (TimeoutException,
                                                    NoSuchElementException,
-                                                   WebDriverException)
+                                                   WebDriverException,
+                                                   ElementClickInterceptedException)
+    from selenium.webdriver.common.action_chains import ActionChains
     SEL = True
 except ImportError:
     SEL = False
@@ -33,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.20"
+VERSION = "1.0.21"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -122,11 +124,12 @@ PLATFORM_RULES = {
     },
     "NBA Docomo": {
         "selector":      "XPath",
-        "targets":       '//*[@data-src="/assets/icon/play.svg"]',
+        "targets":       '//video-js[contains(@class,"video-js")]',
         "refresh_first": True,
         "click_delay":   2000,
         "scroll_after":  290,
-        "load_wait":     10,
+        "load_wait":     5,
+        "key_press":     " ",
     },
     "Paramount+": {
         "selector":      "XPath",
@@ -322,6 +325,7 @@ class App:
         self._kw_frame.grid_remove()
         self.event_kw_var.trace_add("write", self._on_kw_changed)
         self._base_targets = ""
+        self._key_press = ""
         r += 1
 
         # selector type
@@ -380,9 +384,10 @@ class App:
         ttk.Label(p, text="Scroll after click (px):").grid(row=r, column=0, sticky="w", pady=3)
         self.scroll_after_var = tk.IntVar(value=0)
         f_scroll = ttk.Frame(p); f_scroll.grid(row=r, column=1, sticky="w", padx=8)
-        tk.Spinbox(f_scroll, from_=0, to=5000, textvariable=self.scroll_after_var,
+        self.scroll_after_spin = tk.Spinbox(f_scroll, from_=0, to=5000, textvariable=self.scroll_after_var,
                    width=8, bg="#3c3c3c", fg="#ffffff",
-                   buttonbackground="#555555", insertbackground="#ffffff").pack(side="left")
+                   buttonbackground="#555555", insertbackground="#ffffff")
+        self.scroll_after_spin.pack(side="left")
         i5 = ttk.Label(f_scroll, text=" ⓘ", foreground="#888888", cursor="hand2")
         i5.pack(side="left")
         Tooltip(i5, "Pixels to scroll down after a successful click.\n"
@@ -654,10 +659,15 @@ class App:
                 self.scroll_after_var.set(rule["scroll_after"])
             else:
                 self.scroll_after_var.set(0)
+            # force spinbox visual refresh on Windows (IntVar.set alone may not update display)
+            val = self.scroll_after_var.get()
+            self.scroll_after_spin.delete(0, "end")
+            self.scroll_after_spin.insert(0, str(val))
             if "load_wait" in rule:
                 self.load_var.set(rule["load_wait"])
             else:
                 self.load_var.set(5)
+            self._key_press = rule.get("key_press", "")
         # TOD, Paramount+, NBA Docomo and Disney+ SE default to Edge
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX"):
             self.browser_var.set("Edge")
@@ -849,13 +859,28 @@ class App:
         load_s = self.load_var.get(); delay_ms = self.delay_var.get()
         scroll_px = self.scroll_after_var.get()
         if load_s > 0: time.sleep(load_s)
+        # scroll BEFORE click when key_press is used (e.g. NBA Docomo)
+        if self._key_press and scroll_px > 0:
+            self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
+            self.log(f"  ↓  scrolled {scroll_px}px before click", "OK")
+            time.sleep(0.5)
         ok = 0
         for t in targets:
             try:
                 el = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((by, t)))
-                el.click(); self.log(f"  ✓  clicked '{t}'", "OK"); ok += 1
-                if scroll_px > 0:
+                try:
+                    el.click()
+                except ElementClickInterceptedException:
+                    self.driver.execute_script("arguments[0].click()", el)
+                if self._key_press:
+                    time.sleep(0.3)
+                    ActionChains(self.driver).send_keys(self._key_press).perform()
+                    self.log(f"  ✓  clicked + key '{self._key_press}' on '{t}'", "OK")
+                else:
+                    self.log(f"  ✓  clicked '{t}'", "OK")
+                ok += 1
+                if scroll_px > 0 and not self._key_press:
                     time.sleep(0.5)
                     self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
                     self.log(f"  ↓  scrolled {scroll_px}px", "OK")
