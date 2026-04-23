@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OTT AutoClicker – compatible with Python 3.9 / macOS system Tk"""
 from __future__ import annotations
-import os, sys, platform, time, threading, datetime
+import os, sys, platform, time, threading, datetime, subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import urllib.request
@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.21"
+VERSION = "1.0.23"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -268,7 +268,8 @@ class App:
                      values=["Chrome","Edge"], state="readonly", width=14
                      ).grid(row=r, column=1, sticky="w", padx=8)
         self.sys_profile_var = tk.BooleanVar(value=False)
-        sp_cb = ttk.Checkbutton(p, text="Use system profile", variable=self.sys_profile_var)
+        sp_cb = ttk.Checkbutton(p, text="Use system profile", variable=self.sys_profile_var,
+                                command=self._on_sys_profile_toggle)
         sp_cb.grid(row=r, column=2, sticky="w", pady=3)
         i_sp = ttk.Label(p, text=" ⓘ", foreground="#888888", cursor="hand2")
         i_sp.grid(row=r, column=3, sticky="w")
@@ -742,6 +743,97 @@ class App:
         self.log_box.config(state="disabled")
 
     # ── browser ───────────────────────────────────────────────────────────────
+    def _kill_procs(self, procs_win, procs_mac):
+        """Kill a list of processes. Returns list of killed names."""
+        killed = []
+        if IS_MAC:
+            for name in procs_mac:
+                try:
+                    r = subprocess.run(["pkill", "-f", name], capture_output=True)
+                    if r.returncode == 0:
+                        killed.append(name)
+                except Exception:
+                    pass
+        else:
+            for proc in procs_win:
+                try:
+                    r = subprocess.run(
+                        ["taskkill", "/F", "/IM", proc, "/T"],
+                        capture_output=True, text=True, creationflags=0x08000000)
+                    if r.returncode == 0:
+                        killed.append(proc)
+                except Exception:
+                    pass
+        return killed
+
+    def _on_sys_profile_toggle(self):
+        """When 'Use system profile' is checked, show kill-browser dialog."""
+        if not self.sys_profile_var.get():
+            return  # unchecked — nothing to do
+
+        choice = tk.StringVar(value="cancel")
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Close browsers")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.transient(self.root)
+        self.root.update_idletasks()
+        rx = self.root.winfo_x(); ry = self.root.winfo_y()
+        rw = self.root.winfo_width(); rh = self.root.winfo_height()
+        dlg.update_idletasks()
+        dw = dlg.winfo_reqwidth(); dh = dlg.winfo_reqheight()
+        dlg.geometry(f"+{rx + (rw - dw)//2}+{ry + (rh - dh)//2}")
+
+        tk.Label(dlg,
+                 text="Which browser processes should be closed?",
+                 font=("", 10, "bold")).pack(padx=20, pady=(12, 4))
+        tk.Label(dlg,
+                 text="The system profile is locked while the browser is open.\n"
+                      "Selenium cannot attach to it if Chrome or Edge is already running.\n"
+                      "Close all instances before opening the browser here.",
+                 justify="left", foreground="#888888").pack(padx=20, pady=(0, 10))
+
+        bf = tk.Frame(dlg, padx=16, pady=8)
+        bf.pack()
+
+        def pick(val):
+            choice.set(val)
+            dlg.destroy()
+
+        tk.Button(bf, text="Kill Chrome", width=14,
+                  command=lambda: pick("chrome")).grid(row=0, column=0, padx=4, pady=4)
+        tk.Button(bf, text="Kill Edge",   width=14,
+                  command=lambda: pick("edge")).grid(row=0, column=1, padx=4, pady=4)
+        tk.Button(bf, text="Both",        width=14,
+                  command=lambda: pick("both")).grid(row=0, column=2, padx=4, pady=4)
+        tk.Button(bf, text="Cancel",      width=14,
+                  command=lambda: pick("cancel")).grid(row=0, column=3, padx=4, pady=4)
+
+        dlg.wait_window()
+
+        val = choice.get()
+        if val == "cancel":
+            self.sys_profile_var.set(False)
+            return
+
+        chrome_win = ["chrome.exe", "chromedriver.exe"]
+        chrome_mac = ["Google Chrome", "chromedriver"]
+        edge_win   = ["msedge.exe", "msedgedriver.exe"]
+        edge_mac   = ["Microsoft Edge", "msedgedriver"]
+
+        if val == "chrome":
+            killed = self._kill_procs(chrome_win, chrome_mac)
+        elif val == "edge":
+            killed = self._kill_procs(edge_win, edge_mac)
+        else:  # both
+            killed = self._kill_procs(chrome_win + edge_win, chrome_mac + edge_mac)
+
+        if killed:
+            self.log(f"Closed for system profile: {', '.join(killed)}", "WARN")
+        else:
+            self.log("System profile: no running browser processes found.", "WARN")
+
     def open_browser(self):
         if not SEL:
             messagebox.showerror("Missing","Install: pip3 install selenium"); return
@@ -773,6 +865,9 @@ class App:
                 o.add_argument("--profile-directory=Default")
                 o.add_argument("--disable-blink-features=AutomationControlled")
                 o.add_argument("--disable-gpu")
+                o.add_argument("--disable-gpu-compositing")
+                o.add_argument("--disable-accelerated-2d-canvas")
+                o.add_argument("--disable-accelerated-video-decode")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
