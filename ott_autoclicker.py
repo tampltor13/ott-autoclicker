@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.27"
+VERSION = "1.0.28"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -223,6 +223,7 @@ class App:
         os.makedirs(PROFILE_DIR, exist_ok=True)
         self._build()
         threading.Thread(target=self._check_update, daemon=True).start()
+        threading.Thread(target=self._fetch_ip, daemon=True).start()
 
     def _load_prefs(self):
         try:
@@ -275,6 +276,15 @@ class App:
         p.pack(fill="both", expand=True)
 
         r = 0
+        # IP address display
+        self.ip_var = tk.StringVar(value="IP: …")
+        ip_frame = ttk.Frame(p)
+        ip_frame.grid(row=r, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        ttk.Label(ip_frame, textvariable=self.ip_var, foreground="#4fc3f7").pack(side="left")
+        ttk.Button(ip_frame, text="↺", width=2,
+                   command=lambda: threading.Thread(target=self._fetch_ip, daemon=True).start()
+                   ).pack(side="left", padx=(6, 0))
+        r += 1
         # browser + platform u istom redu
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
         self.browser_var = tk.StringVar(value="Chrome")
@@ -622,6 +632,19 @@ class App:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self._captures, f, indent=2, ensure_ascii=False)
         messagebox.showinfo("Saved", f"Saved {len(self._captures)} capture(s) to:\n{path}")
+
+    # ── IP fetch ──────────────────────────────────────────────────────────────
+    def _fetch_ip(self):
+        self.root.after(0, lambda: self.ip_var.set("IP: …"))
+        try:
+            import json
+            with urllib.request.urlopen("http://ip-api.com/json/?fields=query,country", timeout=5) as r:
+                data = json.loads(r.read().decode())
+            ip      = data.get("query", "?")
+            country = data.get("country", "?")
+            self.root.after(0, lambda: self.ip_var.set(f"IP: {ip}  ({country})"))
+        except Exception:
+            self.root.after(0, lambda: self.ip_var.set("IP: unavailable"))
 
     # ── auto-update ───────────────────────────────────────────────────────────
     def _check_update(self):

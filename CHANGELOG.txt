@@ -237,6 +237,15 @@ v1.0.25 — Default browser fix per platform
   - Previously, switching from an Edge platform to a Chrome platform kept Edge selected
 
 
+v1.0.26 — Browser window position memory
+-----------------------------------------
+- Chrome and Edge browser window position/size now saved separately in prefs.json
+- On close: saves current position and size per browser (chrome_browser / edge_browser)
+- On open: restores last saved position and size for that browser
+- Default size remains 550x450 if no saved position exists yet
+- Refactored prefs.json handling: _load_prefs() and _save_prefs() helpers
+
+
 v1.0.27 — Prime Video selectors unified (no keyword filter)
 -----------------------------------------------------------
 - Removed contains() keyword filter from all Amazon Prime / Prime Video platforms:
@@ -246,10 +255,10 @@ v1.0.27 — Prime Video selectors unified (no keyword filter)
 - Default browser per platform remains unchanged
 
 
-v1.0.26 — Browser window position memory
------------------------------------------
-- Chrome and Edge browser window position/size now saved separately in prefs.json
-- On close: saves current position and size per browser (chrome_browser / edge_browser)
-- On open: restores last saved position and size for that browser
-- Default size remains 550x450 if no saved position exists yet
-- Refactored prefs.json handling: _load_prefs() and _save_prefs() helpers
+v1.0.28 — IP address display
+------------------------------
+- Added IP address label at top of Setup tab
+- Shows current public IP and country on startup: e.g. "IP: 185.x.x.x  (Germany)"
+- Useful for verifying VPN is active before starting monitoring
+- Refresh button (↺) to re-fetch IP manually at any time
+- Uses ip-api.com (HTTP, no SSL issues)
