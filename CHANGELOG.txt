@@ -120,8 +120,6 @@ v1.0.13 — NBA Docomo + Scroll after click + Coupang Play
 - Added Coupang Play platform (coupangplay.com, Chrome default)
   - Selector: //*[@data-cy="playCtaButtonText"]
 - Added Scroll after click (px) field to Setup tab
-  - Scrolls page down after successful click using document.body.scrollBy
-  - 0 = disabled (default for all platforms except NBA Docomo)
 - Added load_wait per platform rule (page-load wait loaded from PLATFORM_RULES)
 - scroll_after and load_wait applied automatically on platform select
 
@@ -129,20 +127,14 @@ v1.0.13 — NBA Docomo + Scroll after click + Coupang Play
 v1.0.14 — Inspector tab + launcher exe
 ----------------------------------------
 - Added Inspector tab (third tab, after Monitor)
-  - Start/Stop Inspect Mode button
-  - Injects JS click listener into open browser page
-  - Captures: tag, classes, href, text, data-* attributes, suggested XPath
-  - Walks up DOM tree to find meaningful parent element (article, a, button, live/play/watch/event classes)
+  - Injects JS click listener, captures tag/classes/href/text/data-* attributes
+  - Walks up DOM tree to find meaningful parent element
   - Displays captures in scrollable log with color-coded keys/values
   - Auto re-injects after page refresh or navigation
-  - Clear button clears capture log
-  - Save to file exports all captures to captures.json
-  - Fixed: removed preventDefault/stopPropagation so browser navigation still works
+  - Clear button + Save to file (captures.json)
 - Added AutoClicker.exe via PyInstaller (launcher only, never changes)
-- Added build_launcher.bat: builds AutoClicker.exe on Windows with favicon.ico
-- Added launcher.py: minimal script that runs ott_autoclicker.py via pythonw
-- Added favicon.ico as app icon
-- Added Disney+ SE (same selectors as Disney+, Edge default — Sweden account)
+- Added build_launcher.bat, launcher.py, favicon.ico
+- Added Disney+ SE (Edge default — Sweden account)
 - Window height increased to 600x400
 
 
@@ -151,7 +143,6 @@ v1.0.15 — Rollback base + Disney+ DK
 - Rolled back to stable base (v1.0.14 backup from GitHub)
 - Renamed Disney+ Edge to Disney+ SE
 - Added Disney+ DK (Denmark account, Edge default, same selectors)
-- All Disney+ variants: Edge default for SE and DK, Chrome for Disney+ and AR
 
 
 v1.0.16 — Disney+ AR + selector fix
@@ -159,25 +150,30 @@ v1.0.16 — Disney+ AR + selector fix
 - Added Disney+ AR (Argentina account, Chrome default)
 - Fixed Disney+ selector: removed contains(.,"CONTINUE") text filter
   - Now uses //*[@data-testid="playback-action-button"] only
-  - Works for both "CONTINUE" and "WATCH LIVE" button states
   - Applied to all Disney+ variants (Disney+, SE, DK, AR)
+
 
 v1.0.17 — Use system profile option
 --------------------------------------
 - Added "Use system profile" checkbox in Setup tab (next to Browser dropdown)
 - When checked: Selenium uses the real Chrome/Edge User Data profile (already logged in)
-- When unchecked (default): uses browser_profiles/ folder as before — no change to existing behavior
-- Useful when profile copy doesn't transfer login sessions correctly
+- When unchecked (default): uses browser_profiles/ folder as before
 - Warning: close regular browser before using system profile in Selenium
 
 
 v1.0.18 — Platform dropdown fixes + Amazon Prime US rename
 -----------------------------------------------------------
 - Renamed "Prime Video" to "Amazon Prime US"
-- Fixed Platform combobox alignment: was pushed far right (column 3), now aligned left like Browser and URL
+- Fixed Platform combobox alignment
 - Browser dropdown made slightly wider (width 14)
 - Platform combobox now allows typing/filtering (no longer strictly readonly)
 - Disney+ AR: default page-load wait set to 10s
+
+
+v1.0.19 — Prime Video MX
+--------------------------
+- Added Prime Video MX (primevideo.com, Edge default)
+  - Selector: contains(.,"Ver")
 
 
 v1.0.20 — Disney+ modal selector + load_wait bug fix
@@ -185,7 +181,7 @@ v1.0.20 — Disney+ modal selector + load_wait bug fix
 - All Disney+ variants (Disney+, SE, DK, AR): added modal-action-button
   as first target, playback-action-button as fallback
   - Handles popup ("Watch Live / Watch from Beginning") that appears
-    when not entering live immediately; modal click is harmless if absent
+    when not entering live immediately
 - Fixed bug: switching away from Disney+ AR (load_wait 10s) to another
   platform no longer keeps the 10s page-load wait — resets to 5s default
 
@@ -197,7 +193,63 @@ v1.0.21 — JS click fallback + NBA Docomo space-key playback
   click which bypasses visual interception — works for all platforms
 - NBA Docomo playback sequence overhauled:
   - Selector changed to //video-js[contains(@class,"video-js")] (VideoJS container)
-  - Sequence: refresh → 10s load wait → scroll 290px → click video-js (focus) → space key
+  - Sequence: refresh → load wait → scroll 290px → click video-js (focus) → space key
   - Scroll now happens BEFORE click when key_press is configured
   - Space key triggers live playback after video player has focus
-- key_press field added to platform rules (drives post-click keyboard input)
+- key_press field added to platform rules
+
+
+v1.0.22 — Use system profile: kill browsers dialog
+---------------------------------------------------
+- "Use system profile" checkbox now shows a confirmation dialog when checked
+- Dialog offers: Kill Chrome / Kill Edge / Both / Cancel
+- Selecting Kill Chrome/Edge/Both force-closes running browser + driver processes
+  before Selenium tries to attach (prevents "profile locked" session errors)
+- Selecting Cancel reverts the checkbox to unchecked
+- Dialog centered relative to the main app window
+- Works on Windows (taskkill) and macOS (pkill)
+- Spinbox scroll px display fix: force-refreshes value on platform change
+- NBA Docomo default page-load wait reduced from 10s to 5s
+
+
+v1.0.23 — GPU compositing flags
+---------------------------------
+- Added GPU flags to reduce black screen on region capture:
+  --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode (applied to both Chrome and Edge)
+
+
+v1.0.24 — Prime Video FR + auto-update fix
+------------------------------------------
+- Added Prime Video FR (primevideo.com, Chrome default)
+  - Selectors without keyword filter: data-automation-id + data-testid only
+  - No contains() text filter — ID selectors are sufficient
+- Fixed auto-updater bug: version comparison was using != instead of >
+  - App would offer to "update" to older GitHub version if local version was newer
+  - Now uses proper tuple comparison so only genuinely newer versions trigger update
+
+
+v1.0.25 — Default browser fix per platform
+-------------------------------------------
+- Fixed: switching platforms now always resets browser to correct default
+  - Edge platforms (TOD, Paramount+, NBA Docomo, Disney+ SE/DK, Prime Video MX) → Edge
+  - All other platforms → Chrome
+  - Previously, switching from an Edge platform to a Chrome platform kept Edge selected
+
+
+v1.0.27 — Prime Video selectors unified (no keyword filter)
+-----------------------------------------------------------
+- Removed contains() keyword filter from all Amazon Prime / Prime Video platforms:
+  Amazon Prime US, Prime Video USA, IT, BR, UK, DE, ES, JP, MX, FR
+- All now use only: //*[@data-automation-id="circular-playbutton"]
+  and //*[@data-testid="play"] — ID selectors sufficient for all regions
+- Default browser per platform remains unchanged
+
+
+v1.0.26 — Browser window position memory
+-----------------------------------------
+- Chrome and Edge browser window position/size now saved separately in prefs.json
+- On close: saves current position and size per browser (chrome_browser / edge_browser)
+- On open: restores last saved position and size for that browser
+- Default size remains 550x450 if no saved position exists yet
+- Refactored prefs.json handling: _load_prefs() and _save_prefs() helpers

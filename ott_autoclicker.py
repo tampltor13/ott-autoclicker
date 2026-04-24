@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.23"
+VERSION = "1.0.27"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -50,6 +50,7 @@ PLATFORMS = {
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
+    "Prime Video FR": "https://www.primevideo.com",
     "Coupang Play": "https://www.coupangplay.com",
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
@@ -64,55 +65,61 @@ PLATFORMS = {
 PLATFORM_RULES = {
     "Amazon Prime US": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video USA": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video IT": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Guarda")]\n//*[@data-testid="play" and contains(.,"Guarda")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video BR": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Assistir")]\n//*[@data-testid="play" and contains(.,"Assistir")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video UK": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video DE": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video ES": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video JP": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Watch")]\n//*[@data-testid="play" and contains(.,"Watch")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
     "Prime Video MX": {
         "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton" and contains(.,"Ver")]\n//*[@data-testid="play" and contains(.,"Ver")]',
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Prime Video FR": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -217,24 +224,31 @@ class App:
         self._build()
         threading.Thread(target=self._check_update, daemon=True).start()
 
-    def _load_geometry(self):
+    def _load_prefs(self):
         try:
             import json
             with open(PREFS_FILE) as f:
-                prefs = json.load(f)
-            self.root.geometry(prefs.get("geometry", "600x400+{}+{}".format(
-                self.root.winfo_screenwidth() - 630, 40)))
+                return json.load(f)
         except Exception:
-            self.root.geometry("600x400+{}+{}".format(
-                self.root.winfo_screenwidth() - 630, 40))
+            return {}
 
-    def _on_close(self):
+    def _save_prefs(self, data):
         try:
             import json
+            existing = self._load_prefs()
+            existing.update(data)
             with open(PREFS_FILE, "w") as f:
-                json.dump({"geometry": self.root.geometry()}, f)
+                json.dump(existing, f)
         except Exception:
             pass
+
+    def _load_geometry(self):
+        prefs = self._load_prefs()
+        self.root.geometry(prefs.get("geometry", "600x400+{}+{}".format(
+            self.root.winfo_screenwidth() - 630, 40)))
+
+    def _on_close(self):
+        self._save_prefs({"geometry": self.root.geometry()})
         self.root.destroy()
 
     # ────────────────────────────────────────────────────────────────────────
@@ -614,7 +628,9 @@ class App:
         try:
             with urllib.request.urlopen(UPDATE_VERSION_URL, timeout=5) as r:
                 remote = r.read().decode().strip()
-            if remote != VERSION:
+            def _ver(v):
+                return tuple(int(x) for x in v.split("."))
+            if _ver(remote) > _ver(VERSION):
                 self.root.after(0, lambda v=remote: self._prompt_update(v))
         except Exception:
             pass  # no internet or server down — silently skip
@@ -669,9 +685,11 @@ class App:
             else:
                 self.load_var.set(5)
             self._key_press = rule.get("key_press", "")
-        # TOD, Paramount+, NBA Docomo and Disney+ SE default to Edge
+        # set default browser per platform
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX"):
             self.browser_var.set("Edge")
+        elif name:
+            self.browser_var.set("Chrome")
         # show/hide event keyword field
         if name == "Paramount+":
             self._kw_label.grid()
@@ -882,7 +900,17 @@ class App:
                             o.binary_location = ep
                             break
                     self.driver = webdriver.Edge(options=o)
-                self.driver.set_window_size(550, 450)
+                # restore saved browser window position/size
+                prefs = self._load_prefs()
+                bkey = f"{browser.lower()}_browser"
+                bpref = prefs.get(bkey, {})
+                w = bpref.get("width", 550)
+                h = bpref.get("height", 450)
+                x = bpref.get("x", None)
+                y = bpref.get("y", None)
+                self.driver.set_window_size(w, h)
+                if x is not None and y is not None:
+                    self.driver.set_window_position(x, y)
                 self.driver.execute_script(
                     "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
                 if url:
@@ -911,6 +939,16 @@ class App:
 
     def close_browser(self):
         if self.driver:
+            try:
+                bkey = f"{self.browser_var.get().lower()}_browser"
+                pos  = self.driver.get_window_position()
+                size = self.driver.get_window_size()
+                self._save_prefs({bkey: {
+                    "x": pos["x"], "y": pos["y"],
+                    "width": size["width"], "height": size["height"],
+                }})
+            except Exception:
+                pass
             try: self.driver.quit()
             except Exception: pass
             self.driver = None
