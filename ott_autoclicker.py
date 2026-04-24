@@ -35,10 +35,11 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.28"
+VERSION = "1.0.29"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
+UPDATE_VBS_URL     = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/run.vbs"
 
 PLATFORMS = {
     "Amazon Prime US": "https://www.primevideo.com",
@@ -667,10 +668,21 @@ class App:
     def _do_update(self):
         try:
             script_path = os.path.abspath(__file__)
+            app_dir = os.path.dirname(script_path)
             with urllib.request.urlopen(UPDATE_SCRIPT_URL, timeout=15) as r:
                 new_code = r.read()
             with open(script_path, "wb") as f:
                 f.write(new_code)
+            # also update run.vbs if it exists next to the script
+            vbs_path = os.path.join(app_dir, "run.vbs")
+            if os.path.exists(vbs_path):
+                try:
+                    with urllib.request.urlopen(UPDATE_VBS_URL, timeout=10) as r:
+                        new_vbs = r.read()
+                    with open(vbs_path, "wb") as f:
+                        f.write(new_vbs)
+                except Exception:
+                    pass  # non-critical, don't block the update
             messagebox.showinfo("Updated", "Update downloaded. Restarting…")
             os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
@@ -902,27 +914,93 @@ class App:
                     o = COptions()
                 else:
                     o = EOptions()
+                # detect active profile directory for system profile
+                profile_dir_name = "Default"
+                if use_sys and not IS_MAC:
+                    try:
+                        import json as _json
+                        local_state_path = os.path.join(pdir, "Local State")
+                        with open(local_state_path, encoding="utf-8") as _f:
+                            _ls = _json.load(_f)
+                        profile_dir_name = _ls.get("profile", {}).get("last_used", "Default")
+                    except Exception:
+                        profile_dir_name = "Default"
+                    self.root.after(0, lambda p=profile_dir_name: self.log(f"Using profile directory: {p}"))
                 o.add_argument(f"--user-data-dir={pdir}")
-                o.add_argument("--profile-directory=Default")
+                o.add_argument(f"--profile-directory={profile_dir_name}")
                 o.add_argument("--disable-blink-features=AutomationControlled")
-                o.add_argument("--disable-gpu")
-                o.add_argument("--disable-gpu-compositing")
-                o.add_argument("--disable-accelerated-2d-canvas")
-                o.add_argument("--disable-accelerated-video-decode")
+                if browser == "Chrome":
+                    o.add_argument("--disable-gpu")
+                    o.add_argument("--disable-gpu-compositing")
+                    o.add_argument("--disable-accelerated-2d-canvas")
+                    o.add_argument("--disable-accelerated-video-decode")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
                     self.driver = webdriver.Chrome(options=o)
                 else:
-                    edge_paths = [
-                        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-                        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-                    ]
-                    for ep in edge_paths:
-                        if os.path.exists(ep):
-                            o.binary_location = ep
-                            break
-                    self.driver = webdriver.Edge(options=o)
+                    edge_bin = None
+                    # 1) try Windows registry (most reliable)
+                    if not IS_MAC:
+                        try:
+                            import winreg
+                            key = winreg.OpenKey(
+                                winreg.HKEY_LOCAL_MACHINE,
+                                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe")
+                            edge_bin, _ = winreg.QueryValueEx(key, "")
+                            winreg.CloseKey(key)
+                        except Exception:
+                            edge_bin = None
+                    # 2) fallback: known install paths
+                    if not edge_bin or not os.path.exists(edge_bin):
+                        for ep in [
+                            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                            os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                                         r"Microsoft\Edge\Application\msedge.exe"),
+                        ]:
+                            if os.path.exists(ep):
+                                edge_bin = ep
+                                break
+                    if edge_bin:
+                        o.binary_location = edge_bin
+                        self.root.after(0, lambda b=edge_bin: self.log(f"Edge binary: {b}"))
+                    else:
+                        self.root.after(0, lambda: self.log(
+                            "Edge binary not found in registry or known paths", "WARN"))
+                    # find msedgedriver locally — avoids Selenium Manager network download
+                    import shutil as _shutil
+                    msedgedriver = None
+                    drv_name = "msedgedriver.exe" if not IS_MAC else "msedgedriver"
+                    # a) app folder (user can drop msedgedriver.exe next to the script)
+                    _app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+                    _local = os.path.join(_app_dir, drv_name)
+                    if os.path.exists(_local):
+                        msedgedriver = _local
+                    # b) PATH
+                    if not msedgedriver:
+                        msedgedriver = _shutil.which("msedgedriver") or _shutil.which(drv_name)
+                    # c) Selenium Manager cache  (~/.cache/selenium or %LOCALAPPDATA%\selenium)
+                    if not msedgedriver:
+                        _cache_roots = [
+                            os.path.join(os.environ.get("LOCALAPPDATA", ""), "selenium", "msedgedriver"),
+                            os.path.join(os.path.expanduser("~"), ".cache", "selenium", "msedgedriver"),
+                        ]
+                        for _cr in _cache_roots:
+                            if os.path.isdir(_cr):
+                                for _root, _dirs, _files in os.walk(_cr):
+                                    if drv_name in _files:
+                                        msedgedriver = os.path.join(_root, drv_name)
+                                        break
+                            if msedgedriver:
+                                break
+                    if msedgedriver:
+                        self.root.after(0, lambda d=msedgedriver: self.log(f"EdgeDriver: {d}"))
+                        self.driver = webdriver.Edge(service=EService(msedgedriver), options=o)
+                    else:
+                        self.root.after(0, lambda: self.log(
+                            "msedgedriver not found locally — Selenium Manager will try to download it…", "WARN"))
+                        self.driver = webdriver.Edge(options=o)
                 # restore saved browser window position/size
                 prefs = self._load_prefs()
                 bkey = f"{browser.lower()}_browser"
