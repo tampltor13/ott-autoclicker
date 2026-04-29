@@ -262,3 +262,54 @@ v1.0.28 — IP address display
 - Useful for verifying VPN is active before starting monitoring
 - Refresh button (↺) to re-fetch IP manually at any time
 - Uses ip-api.com (HTTP, no SSL issues)
+
+
+v1.0.29 — Edge driver + launcher fixes
+----------------------------------------
+- Edge binary detection: added Windows registry lookup (most reliable) + fallback
+  to %LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe as third path
+- msedgedriver lookup: searches app folder, PATH, and Selenium Manager cache
+  (~/.cache/selenium / %LOCALAPPDATA%\selenium) before falling back to Selenium
+  Manager network download — fixes Edge not opening when VPN blocks the download
+- System profile: auto-detects the last-used profile directory from Local State
+  JSON (e.g. "Profile 1" instead of hardcoded "Default") — fixes Selenium opening
+  a fresh empty profile instead of the real signed-in profile
+- GPU flags (--disable-gpu etc.) now applied to Chrome only, not Edge
+- run.vbs: finds Python via Windows registry (HKLM + HKCU, versions 3.6–3.13)
+  instead of relying on PATH — fixes app not starting after PC restart
+- Auto-update now also updates run.vbs alongside ott_autoclicker.py
+- Coupang Play default browser changed from Chrome to Edge
+
+
+v1.0.30 — Compact Mode
+------------------------
+- Added Compact Mode button in status bar (bottom right)
+- Clicking "Compact Mode" hides the notebook tabs and shrinks the window to a
+  minimal bar showing only status + last log line
+- Status bar (with "Expand" button) always remains visible in compact mode
+- Clicking "Expand" restores the full window to its original size and position
+
+
+v1.0.32 — SPOTV Now JP Ctrl+click (open in tab)
+-------------------------------------------------
+- SPOTV Now JP: click changed to Ctrl+click so live page opens in a new
+  browser tab (same window) instead of a new popup window
+- New platform rule field: ctrl_click — when True, uses ActionChains
+  key_down(CTRL) → click → key_up(CTRL) instead of regular Selenium click
+- New platform rule field: post_switch_wait — extra wait (seconds) after
+  switching to the new tab, before clicking the post-click popup target
+- SPOTV Now JP timing: 3s wait → switch to new tab → 3s wait → click popup
+- post_switch_wait added to _loop() between tab switch and post_click_targets
+- ctrl_click and post_switch_wait default to False/0 — no other platforms affected
+
+
+v1.0.31 — SPOTV Now JP
+------------------------
+- Added SPOTV Now JP platform (spotvnow.jp/schedule/0, Chrome default)
+- Event keyword field (same as Paramount+): type team name to target that
+  specific match row — e.g. "Cleveland Guardians"
+- Page-load wait: 8s (SPA needs time to render the schedule)
+- Selector targets view-box live class (live matches only, not reservations)
+- Post-click popup handling: after clicking the live button, waits 4s and
+  automatically clicks the "リアルタイムで視聴" (watch live) confirmation button
+  if it appears — skips silently if popup is not present

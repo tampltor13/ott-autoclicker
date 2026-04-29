@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.29"
+VERSION = "1.0.32"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -53,6 +53,7 @@ PLATFORMS = {
     "Prime Video MX": "https://www.primevideo.com",
     "Prime Video FR": "https://www.primevideo.com",
     "Coupang Play": "https://www.coupangplay.com",
+    "SPOTV Now JP": "https://spotvnow.jp/schedule/0",
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
@@ -129,6 +130,18 @@ PLATFORM_RULES = {
         "targets":       '//*[@data-cy="playCtaButtonText"]',
         "refresh_first": True,
         "click_delay":   2000,
+    },
+    "SPOTV Now JP": {
+        "selector":           "XPath",
+        "targets":            '//div[contains(@class,"match-column")]//div[contains(@class,"view-box live")]',
+        "post_click_targets": '//button[contains(@class,"vue-confirm-btn live-btn")]',
+        "post_click_wait":    3,   # wait before switching to new tab
+        "post_switch_wait":   3,   # wait after switching, before clicking popup
+        "prevent_new_window": True,
+        "ctrl_click":         True,
+        "refresh_first":      True,
+        "click_delay":        2000,
+        "load_wait":          8,
     },
     "NBA Docomo": {
         "selector":      "XPath",
@@ -255,21 +268,36 @@ class App:
 
     # ────────────────────────────────────────────────────────────────────────
     def _build(self):
-        nb = ttk.Notebook(self.root)
-        nb.pack(fill="both", expand=True, padx=6, pady=6)
+        self._compact      = False
+        self._full_geometry = None
+        self._compact_log_var = tk.StringVar(value="")
 
-        t1 = ttk.Frame(nb); nb.add(t1, text="  Setup  ")
-        t2 = ttk.Frame(nb); nb.add(t2, text="  Monitor  ")
-        t3 = ttk.Frame(nb); nb.add(t3, text="  Inspector  ")
+        self._status_bar = ttk.Frame(self.root, relief="sunken")
+        self._status_bar.pack(fill="x", side="bottom")
+        self.status_var = tk.StringVar(value="Ready")
+        self._compact_btn = ttk.Button(self._status_bar, text="Compact Mode",
+                                       command=self._toggle_compact)
+        self._compact_btn.pack(side="right", padx=4, pady=1)
+        ttk.Label(self._status_bar, textvariable=self.status_var).pack(
+            anchor="w", padx=6, pady=2, side="left")
+
+        self.nb = ttk.Notebook(self.root)
+        self.nb.pack(fill="both", expand=True, padx=6, pady=6)
+
+        t1 = ttk.Frame(self.nb); self.nb.add(t1, text="  Setup  ")
+        t2 = ttk.Frame(self.nb); self.nb.add(t2, text="  Monitor  ")
+        t3 = ttk.Frame(self.nb); self.nb.add(t3, text="  Inspector  ")
         self._setup_tab(t1)
         self._monitor_tab(t2)
         self._inspector_tab(t3)
 
-        status_bar = ttk.Frame(self.root, relief="sunken")
-        status_bar.pack(fill="x", side="bottom")
-        self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(status_bar, textvariable=self.status_var).pack(
-            anchor="w", padx=6, pady=2)
+        # compact mode frame (hidden by default)
+        self._compact_frame = tk.Frame(self.root)
+        tk.Label(self._compact_frame, textvariable=self.status_var,
+                 font=("", 9, "bold"), anchor="w").pack(side="left", padx=(10, 4), pady=8)
+        tk.Label(self._compact_frame, textvariable=self._compact_log_var,
+                 font=("", 8), foreground="#888888", anchor="w").pack(
+                     side="left", padx=4, pady=8, fill="x", expand=True)
 
     # ── SETUP TAB ────────────────────────────────────────────────────────────
     def _setup_tab(self, parent):
@@ -351,7 +379,12 @@ class App:
         self._kw_frame.grid_remove()
         self.event_kw_var.trace_add("write", self._on_kw_changed)
         self._base_targets = ""
-        self._key_press = ""
+        self._key_press          = ""
+        self._post_click_targets = []
+        self._post_click_wait    = 3
+        self._post_switch_wait   = 0
+        self._prevent_new_window = False
+        self._ctrl_click         = False
         r += 1
 
         # selector type
@@ -719,14 +752,19 @@ class App:
                 self.load_var.set(rule["load_wait"])
             else:
                 self.load_var.set(5)
-            self._key_press = rule.get("key_press", "")
+            self._key_press          = rule.get("key_press", "")
+            self._post_click_targets = rule.get("post_click_targets", "").splitlines()
+            self._post_click_wait    = rule.get("post_click_wait", 3)
+            self._post_switch_wait   = rule.get("post_switch_wait", 0)
+            self._prevent_new_window = rule.get("prevent_new_window", False)
+            self._ctrl_click         = rule.get("ctrl_click", False)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
         # show/hide event keyword field
-        if name == "Paramount+":
+        if name in ("Paramount+", "SPOTV Now JP"):
             self._kw_label.grid()
             self._kw_frame.grid()
         else:
@@ -783,12 +821,33 @@ class App:
     def _set_status(self, txt):
         self.root.after(0, lambda t=txt: self.status_var.set(t))
 
+    def _toggle_compact(self):
+        if not self._compact:
+            self._full_geometry = self.root.geometry()
+            self.nb.pack_forget()
+            self._compact_frame.pack(fill="x", before=self._status_bar)
+            self.root.geometry(f"400x60+{self.root.winfo_x()}+{self.root.winfo_y()}")
+            self.root.resizable(False, False)
+            self._compact_btn.configure(text="Expand")
+            self._compact = True
+        else:
+            self._compact_frame.pack_forget()
+            self.nb.pack(fill="both", expand=True, padx=6, pady=6)
+            if self._full_geometry:
+                self.root.geometry(self._full_geometry)
+            self.root.resizable(True, True)
+            self._compact_btn.configure(text="Compact Mode")
+            self._compact = False
+
     def log(self, msg, level="INFO"):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         self.log_box.config(state="normal")
         self.log_box.insert("end", f"[{ts}] {msg}\n", level)
         self.log_box.see("end")
         self.log_box.config(state="disabled")
+        # update compact view with last log line
+        short = msg if len(msg) <= 55 else msg[:52] + "…"
+        self._compact_log_var.set(f"[{ts}] {short}")
 
     def _clear_log(self):
         self.log_box.config(state="normal")
@@ -1103,16 +1162,20 @@ class App:
             try:
                 el = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((by, t)))
-                try:
-                    el.click()
-                except ElementClickInterceptedException:
-                    self.driver.execute_script("arguments[0].click()", el)
-                if self._key_press:
-                    time.sleep(0.3)
-                    ActionChains(self.driver).send_keys(self._key_press).perform()
-                    self.log(f"  ✓  clicked + key '{self._key_press}' on '{t}'", "OK")
+                if self._ctrl_click:
+                    ActionChains(self.driver).key_down(Keys.CONTROL).click(el).key_up(Keys.CONTROL).perform()
+                    self.log(f"  ✓  Ctrl+clicked '{t}'", "OK")
                 else:
-                    self.log(f"  ✓  clicked '{t}'", "OK")
+                    try:
+                        el.click()
+                    except ElementClickInterceptedException:
+                        self.driver.execute_script("arguments[0].click()", el)
+                    if self._key_press:
+                        time.sleep(0.3)
+                        ActionChains(self.driver).send_keys(self._key_press).perform()
+                        self.log(f"  ✓  clicked + key '{self._key_press}' on '{t}'", "OK")
+                    else:
+                        self.log(f"  ✓  clicked '{t}'", "OK")
                 ok += 1
                 if scroll_px > 0 and not self._key_press:
                     time.sleep(0.5)
@@ -1195,6 +1258,7 @@ class App:
                 self.root.after(0, self.stop_monitoring); break
             if refresh_first: self._do_refresh()
             self.root.after(0, lambda: self.log("── click cycle ──", "HEAD"))
+            handles_before = set(self.driver.window_handles) if self._prevent_new_window else set()
             try:
                 ok, tot = self._do_clicks()
                 self.root.after(0, lambda o=ok, t=tot:
@@ -1205,6 +1269,38 @@ class App:
                 self.root.after(0, self.stop_monitoring); break
             if ok > 0:
                 self.root.after(0, lambda: self.log("Click succeeded — stopping.", "OK"))
+                # post-click: try optional targets after page navigates (e.g. popup)
+                if self._post_click_targets:
+                    self.root.after(0, lambda w=self._post_click_wait:
+                        self.log(f"Waiting {w}s for post-click target…"))
+                    self._sleep(self._post_click_wait)
+                    if self._alive():
+                        # switch to new tab/window if one was opened
+                        if self._prevent_new_window:
+                            try:
+                                new_handles = set(self.driver.window_handles) - handles_before
+                                if new_handles:
+                                    self.driver.switch_to.window(new_handles.pop())
+                                    self.root.after(0, lambda: self.log("  →  switched to new tab", "OK"))
+                            except Exception:
+                                pass
+                        # optional second wait after switch (e.g. page needs time to load)
+                        if self._post_switch_wait > 0:
+                            self.root.after(0, lambda w=self._post_switch_wait:
+                                self.log(f"Waiting {w}s for tab to load…"))
+                            self._sleep(self._post_switch_wait)
+                        by = self._by()
+                        for t in self._post_click_targets:
+                            try:
+                                el = WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable((by, t)))
+                                try:
+                                    el.click()
+                                except ElementClickInterceptedException:
+                                    self.driver.execute_script("arguments[0].click()", el)
+                                self.root.after(0, lambda x=t: self.log(f"  ✓  post-click '{x}'", "OK"))
+                            except Exception:
+                                self.root.after(0, lambda x=t: self.log(f"  —  post-click not found: '{x}'"))
                 self.root.after(0, self.stop_monitoring); break
             if refresh_s > 0:
                 self.root.after(0, lambda s=refresh_s:
