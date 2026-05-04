@@ -131,6 +131,7 @@ PLATFORM_RULES = {
         "targets":       '//*[@data-testid="watch-button"]',
         "refresh_first": True,
         "click_delay":   2000,
+        "load_wait":     10,
     },
     "Coupang Play": {
         "selector":      "XPath",

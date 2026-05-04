@@ -28,7 +28,7 @@ if "!PYTHON!"=="" (
     )
 )
 
-:: 3) If still not found — download and run installer, then wait for it to finish
+:: 3) If still not found - download and run installer, then wait for it to finish
 if "!PYTHON!"=="" (
     echo Python not found. Downloading installer...
     curl -L -o python_installer.exe https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
@@ -70,8 +70,19 @@ echo.
 echo Installing dependencies...
 "!PYTHON!" -m pip install --upgrade pip >nul 2>&1
 "!PYTHON!" -m pip install selenium webdriver-manager
+if %errorlevel% neq 0 (
+    echo.
+    echo ERROR: Failed to install dependencies.
+    pause
+    exit /b 1
+)
 echo.
 echo ======================================
 echo   Done! Starting app...
 echo ======================================
 "!PYTHON!" ott_autoclicker.py
+if %errorlevel% neq 0 (
+    echo.
+    echo ERROR: App crashed or failed to start. See error above.
+    pause
+)
