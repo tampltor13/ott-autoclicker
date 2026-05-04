@@ -47,7 +47,7 @@ PLATFORMS = {
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
     "Prime Video UK":  "https://www.amazon.co.uk/",
-    "Prime Video DE":  "https://www.amazon.de/",
+    "Prime Video DE":  "https://www.amazon.de/gp/video/sports",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
