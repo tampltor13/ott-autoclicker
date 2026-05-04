@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.32"
+VERSION = "1.0.34"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -52,6 +52,7 @@ PLATFORMS = {
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
     "Prime Video FR": "https://www.primevideo.com",
+    "Peacock":      "https://www.peacocktv.com/watch/home",
     "Coupang Play": "https://www.coupangplay.com",
     "SPOTV Now JP": "https://spotvnow.jp/schedule/0",
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
@@ -122,6 +123,12 @@ PLATFORM_RULES = {
     "Prime Video FR": {
         "selector":      "XPath",
         "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first": True,
+        "click_delay":   2000,
+    },
+    "Peacock": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="watch-button"]',
         "refresh_first": True,
         "click_delay":   2000,
     },
@@ -759,7 +766,7 @@ class App:
             self._prevent_new_window = rule.get("prevent_new_window", False)
             self._ctrl_click         = rule.get("ctrl_click", False)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -1253,6 +1260,17 @@ class App:
                 self._set_status(f"Waiting {secs}s until start…")
                 self._sleep(1); continue
             self._set_status("Active — clicking")
+            # if driver is focused on a closed tab, switch back to first available tab
+            # (must happen BEFORE _alive() check, which would otherwise stop monitoring)
+            if self.driver:
+                try:
+                    _ = self.driver.current_url
+                except Exception:
+                    try:
+                        self.driver.switch_to.window(self.driver.window_handles[0])
+                        self.root.after(0, lambda: self.log("  ↩  switched back to schedule tab", "WARN"))
+                    except Exception:
+                        pass  # browser truly closed — _alive() will catch it below
             if not self._alive():
                 self.root.after(0, lambda: self.log("Browser closed.", "ERROR"))
                 self.root.after(0, self.stop_monitoring); break
