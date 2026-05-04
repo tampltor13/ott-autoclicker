@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.34"
+VERSION = "1.0.35"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -52,6 +52,7 @@ PLATFORMS = {
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
     "Prime Video FR": "https://www.primevideo.com",
+    "DAZN DE":      "https://www.dazn.com/en-DE/home",
     "Peacock":      "https://www.peacocktv.com/watch/home",
     "Coupang Play": "https://www.coupangplay.com",
     "SPOTV Now JP": "https://spotvnow.jp/schedule/0",
@@ -191,6 +192,12 @@ PLATFORM_RULES = {
         "selector":      "ID",
         "targets":       "watch_live_click",
         "refresh_first": False,
+    },
+    "DAZN DE": {
+        "video_detect":    True,
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":   True,
+        "load_wait":       60,
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -393,6 +400,8 @@ class App:
         self._post_switch_wait   = 0
         self._prevent_new_window = False
         self._ctrl_click         = False
+        self._video_detect       = False
+        self._video_detect_js    = ""
         r += 1
 
         # selector type
@@ -738,12 +747,14 @@ class App:
     def _platform_changed(self, _event=None):
         name = self.platform_var.get()
         self.url_var.set(PLATFORMS.get(name, ""))
+        self._video_detect = False
         rule = PLATFORM_RULES.get(name)
         if rule:
-            self.sel_var.set(rule["selector"])
-            self._base_targets = rule["targets"]
+            if "selector" in rule:
+                self.sel_var.set(rule["selector"])
+            self._base_targets = rule.get("targets", "")
             self.targets_text.delete("1.0", "end")
-            self.targets_text.insert("1.0", rule["targets"])
+            self.targets_text.insert("1.0", rule.get("targets", ""))
             if "refresh_first" in rule:
                 self.refresh_first_var.set(rule["refresh_first"])
             if "click_delay" in rule:
@@ -766,6 +777,8 @@ class App:
             self._post_switch_wait   = rule.get("post_switch_wait", 0)
             self._prevent_new_window = rule.get("prevent_new_window", False)
             self._ctrl_click         = rule.get("ctrl_click", False)
+            self._video_detect       = rule.get("video_detect", False)
+            self._video_detect_js    = rule.get("video_detect_js", "")
         # set default browser per platform
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock"):
             self.browser_var.set("Edge")
@@ -779,7 +792,6 @@ class App:
             self.event_kw_var.set("")
             self._kw_label.grid_remove()
             self._kw_frame.grid_remove()
-
     def _on_kw_changed(self, *_):
         """Live-update targets_text when event keyword changes."""
         kw = self.event_kw_var.get().strip()
@@ -1211,7 +1223,7 @@ class App:
             messagebox.showerror("Missing","Install: pip3 install selenium"); return
         if not self._alive():
             messagebox.showwarning("No browser","Open browser first."); return
-        if not self._targets():
+        if not self._video_detect and not self._targets():
             messagebox.showwarning("No targets","Enter at least one selector."); return
         try:
             s_dt = self._parse_dt(self.start_date.get(), self.start_time.get())
@@ -1276,6 +1288,37 @@ class App:
                 self.root.after(0, lambda: self.log("Browser closed.", "ERROR"))
                 self.root.after(0, self.stop_monitoring); break
             if refresh_first: self._do_refresh()
+
+            # ── VIDEO DETECT MODE (e.g. DAZN) ─────────────────────────────────
+            # No click targets — refresh and check if video started playing via JS.
+            if self._video_detect:
+                self._set_status("Active — watching for video…")
+                load_s = self.load_var.get()
+                if load_s > 0:
+                    self.root.after(0, lambda s=load_s:
+                        self.log(f"  ⏱  page-load wait {s}s…"))
+                    if not self._sleep(load_s): break
+                js = self._video_detect_js
+                playing = False
+                try:
+                    playing = bool(self.driver.execute_script(js))
+                except Exception as e:
+                    err = str(e)
+                    self.root.after(0, lambda e=err: self.log(f"  JS error: {e}", "ERROR"))
+                if playing:
+                    self.root.after(0, lambda: self.log("  ▶  Video playing — stopping.", "OK"))
+                    self.root.after(0, self.stop_monitoring)
+                    break
+                self.root.after(0, lambda: self.log("  —  Video not playing yet…"))
+                if refresh_s > 0:
+                    self.root.after(0, lambda s=refresh_s:
+                        self.log(f"Waiting {s}s before next check…"))
+                    if not self._sleep(refresh_s): break
+                else:
+                    self._sleep(1)
+                continue
+            # ──────────────────────────────────────────────────────────────────
+
             self.root.after(0, lambda: self.log("── click cycle ──", "HEAD"))
             handles_before = set(self.driver.window_handles) if self._prevent_new_window else set()
             try:

@@ -290,6 +290,37 @@ v1.0.30 — Compact Mode
 - Clicking "Expand" restores the full window to its original size and position
 
 
+v1.0.35 — DAZN video detect
+-----------------------------
+- Added DAZN platform (dazn.com, Chrome default)
+- New "video_detect" mode: no click target needed — refreshes page and checks
+  via JavaScript whether a video element has started playing
+- JS condition checked each cycle: video not paused, no error, currentTime > 0,
+  readyState >= 3 (HAVE_FUTURE_DATA) — monitoring stops when all are true
+- "Video detect JS:" field shown in Setup tab when video_detect platform is selected
+  — user can edit the JS condition for other platforms or custom use cases
+- start_monitoring() skips "no targets" warning when video_detect mode is active
+- Default: refresh_first=True, load_wait=10s, refresh every 60s
+
+
+v1.0.34 — Peacock
+------------------
+- Added Peacock platform (peacocktv.com, Edge default)
+- Selector: //*[@data-testid="watch-button"] (Watch Now button)
+- URL: set manually to the specific event page before monitoring
+- refresh_first: True, click_delay: 2000ms
+
+
+v1.0.33 — Auto-recover from closed live tab
+--------------------------------------------
+- Fixed: if the live tab was closed after a successful SPOTV click, the next
+  monitoring cycle would crash with "no such window: target window already closed"
+- _loop() now checks at the start of each cycle if the driver is still on a
+  valid window — if not, automatically switches back to window_handles[0]
+  (the schedule tab) and logs "switched back to main tab"
+- Works for any platform that opens a second tab/window during monitoring
+
+
 v1.0.32 — SPOTV Now JP Ctrl+click (open in tab)
 -------------------------------------------------
 - SPOTV Now JP: click changed to Ctrl+click so live page opens in a new
@@ -313,3 +344,36 @@ v1.0.31 — SPOTV Now JP
 - Post-click popup handling: after clicking the live button, waits 4s and
   automatically clicks the "リアルタイムで視聴" (watch live) confirmation button
   if it appears — skips silently if popup is not present
+
+
+─────────────────────────────────────────────────────────────
+  PREVIEW / REVERTED — istraživanje black screen problema
+─────────────────────────────────────────────────────────────
+
+[PREVIEW] v1.0.34 — GPU flagovi za Chrome (reverted)
+------------------------------------------------------
+Cilj: popraviti crni ekran u World2Capture region/window capture.
+Isprobano redom:
+- --disable-gpu, --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode (od v1.0.23, ostalo aktivno)
+- --use-gl=swiftshader (potpuni software renderer, zaobilazi GPU/ANGLE/D3D)
+- --use-angle=swiftshader (forsira ANGLE software path)
+- --disable-features=VizDisplayCompositor
+Zaključak: nijedan flag nije pomogao. Problem nije u GPU flagovima nego u
+načinu na koji Selenium pokreće Chrome (--remote-debugging-port CDP konekcija
+mijenja DWM kompoziciju prozora). Reverted.
+
+
+[PREVIEW] v1.0.35 — Chrome subprocess launch (reverted)
+---------------------------------------------------------
+Cilj: pokrenuti Chrome kao normalan OS subprocess (ne preko Selenium
+webdriver.Chrome()) pa da World2Capture može čitati prozor.
+Implementirano:
+- subprocess.Popen(chrome.exe --remote-debugging-port=9222 ...)
+- čeka 3s → Selenium se spaja via debuggerAddress CDP
+- Connect button za spajanje na već-otvoreni Chrome
+- chrome_proc cleanup u close_browser()
+Potvrđeno: --remote-debugging-port sam po sebi NE kvari World2Capture
+capture (testom ručnog pokretanja Chrome s flagom capture je radio).
+Problem: kompleksnost spajanja, Chrome ignorira flag ako je već pokrenut,
+korisnik mora killati sve chrome.exe procese. Reverted, nastavlja se kasnije.
