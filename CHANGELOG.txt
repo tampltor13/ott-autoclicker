@@ -290,35 +290,16 @@ v1.0.30 — Compact Mode
 - Clicking "Expand" restores the full window to its original size and position
 
 
-v1.0.35 — DAZN video detect
------------------------------
-- Added DAZN platform (dazn.com, Chrome default)
-- New "video_detect" mode: no click target needed — refreshes page and checks
-  via JavaScript whether a video element has started playing
-- JS condition checked each cycle: video not paused, no error, currentTime > 0,
-  readyState >= 3 (HAVE_FUTURE_DATA) — monitoring stops when all are true
-- "Video detect JS:" field shown in Setup tab when video_detect platform is selected
-  — user can edit the JS condition for other platforms or custom use cases
-- start_monitoring() skips "no targets" warning when video_detect mode is active
-- Default: refresh_first=True, load_wait=10s, refresh every 60s
-
-
-v1.0.34 — Peacock
-------------------
-- Added Peacock platform (peacocktv.com, Edge default)
-- Selector: //*[@data-testid="watch-button"] (Watch Now button)
-- URL: set manually to the specific event page before monitoring
-- refresh_first: True, click_delay: 2000ms
-
-
-v1.0.33 — Auto-recover from closed live tab
---------------------------------------------
-- Fixed: if the live tab was closed after a successful SPOTV click, the next
-  monitoring cycle would crash with "no such window: target window already closed"
-- _loop() now checks at the start of each cycle if the driver is still on a
-  valid window — if not, automatically switches back to window_handles[0]
-  (the schedule tab) and logs "switched back to main tab"
-- Works for any platform that opens a second tab/window during monitoring
+v1.0.31 — SPOTV Now JP
+------------------------
+- Added SPOTV Now JP platform (spotvnow.jp/schedule/0, Chrome default)
+- Event keyword field (same as Paramount+): type team name to target that
+  specific match row — e.g. "Cleveland Guardians"
+- Page-load wait: 8s (SPA needs time to render the schedule)
+- Selector targets view-box live class (live matches only, not reservations)
+- Post-click popup handling: after clicking the live button, waits 4s and
+  automatically clicks the "リアルタイムで視聴" (watch live) confirmation button
+  if it appears — skips silently if popup is not present
 
 
 v1.0.32 — SPOTV Now JP Ctrl+click (open in tab)
@@ -334,16 +315,41 @@ v1.0.32 — SPOTV Now JP Ctrl+click (open in tab)
 - ctrl_click and post_switch_wait default to False/0 — no other platforms affected
 
 
-v1.0.31 — SPOTV Now JP
-------------------------
-- Added SPOTV Now JP platform (spotvnow.jp/schedule/0, Chrome default)
-- Event keyword field (same as Paramount+): type team name to target that
-  specific match row — e.g. "Cleveland Guardians"
-- Page-load wait: 8s (SPA needs time to render the schedule)
-- Selector targets view-box live class (live matches only, not reservations)
-- Post-click popup handling: after clicking the live button, waits 4s and
-  automatically clicks the "リアルタイムで視聴" (watch live) confirmation button
-  if it appears — skips silently if popup is not present
+v1.0.33 — Auto-recover from closed live tab
+--------------------------------------------
+- Fixed: if the live tab was closed after a successful SPOTV click, the next
+  monitoring cycle would crash with "no such window: target window already closed"
+- _loop() now checks at the start of each cycle if the driver is still on a
+  valid window — if not, automatically switches back to window_handles[0]
+  (the schedule tab) and logs "switched back to main tab"
+- Works for any platform that opens a second tab/window during monitoring
+
+
+v1.0.34 — Peacock
+------------------
+- Added Peacock platform (peacocktv.com, Edge default)
+- Selector: //*[@data-testid="watch-button"] (Watch Now button)
+- URL: set manually to the specific event page before monitoring
+- refresh_first: True, click_delay: 2000ms, load_wait: 10s
+
+
+v1.0.35 — DAZN video detect
+-----------------------------
+- Added DAZN DE platform (dazn.com/en-DE/home, Chrome default)
+- New "video_detect" mode: no click target needed — refreshes page and checks
+  via JavaScript whether a video element has started playing
+- JS condition checked each cycle: video not paused, no error, currentTime > 0,
+  readyState >= 3 (HAVE_FUTURE_DATA) — monitoring stops when all are true
+- JS hardcoded in platform rule (video_detect_js field) — not exposed in UI
+- start_monitoring() skips "no targets" warning when video_detect mode is active
+- Default: refresh_first=True, load_wait=60s, refresh every 60s (120s total cycle)
+
+
+v1.0.36 — SPOTV Now JP default browser size
+--------------------------------------------
+- SPOTV Now JP: default browser window size set to 650×550
+- Platform rule browser_size field: overrides saved prefs when opening browser
+- All other platforms remain at 550×450 default
 
 
 ─────────────────────────────────────────────────────────────

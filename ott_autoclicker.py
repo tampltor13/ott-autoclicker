@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.35"
+VERSION = "1.0.36"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -151,6 +151,7 @@ PLATFORM_RULES = {
         "refresh_first":      True,
         "click_delay":        2000,
         "load_wait":          8,
+        "browser_size":       (650, 550),
     },
     "NBA Docomo": {
         "selector":      "XPath",
@@ -1084,8 +1085,12 @@ class App:
                 prefs = self._load_prefs()
                 bkey = f"{browser.lower()}_browser"
                 bpref = prefs.get(bkey, {})
-                w = bpref.get("width", 550)
-                h = bpref.get("height", 450)
+                _rule = PLATFORM_RULES.get(self.platform_var.get(), {})
+                if "browser_size" in _rule:
+                    w, h = _rule["browser_size"]
+                else:
+                    w = bpref.get("width", 550)
+                    h = bpref.get("height", 450)
                 x = bpref.get("x", None)
                 y = bpref.get("y", None)
                 self.driver.set_window_size(w, h)
