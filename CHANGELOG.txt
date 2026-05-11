@@ -345,6 +345,16 @@ v1.0.35 — DAZN video detect
 - Default: refresh_first=True, load_wait=60s, refresh every 60s (120s total cycle)
 
 
+v1.0.37 — EdgeDriver auto version check
+-----------------------------------------
+- EdgeDriver cache version now checked against installed Edge major version
+- If versions don't match (e.g. cached v146, Edge updated to v148): skips
+  cached driver and lets Selenium Manager download the correct version
+- Version extracted from cache path or --version output; Edge version read
+  from Windows registry (HKLM\SOFTWARE\Microsoft\Edge\BLBeacon)
+- No more manual cache deletion needed after Edge auto-updates
+
+
 v1.0.36 — SPOTV Now JP default browser size
 --------------------------------------------
 - SPOTV Now JP: default browser window size set to 650×550

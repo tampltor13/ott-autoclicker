@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.36"
+VERSION = "1.0.37"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -1074,12 +1074,71 @@ class App:
                                         break
                             if msedgedriver:
                                 break
+                    # version check: skip cached driver if major version doesn't match Edge
+                    if msedgedriver:
+                        try:
+                            import re as _re
+                            _cflags = 0x08000000 if not IS_MAC else 0
+                            # driver major version from cache path or --version
+                            _dm = None
+                            _m = _re.search(r'[/\\](\d+)\.\d+\.\d+\.\d+[/\\]', msedgedriver)
+                            if _m:
+                                _dm = int(_m.group(1))
+                            else:
+                                try:
+                                    _r = subprocess.run([msedgedriver, "--version"],
+                                        capture_output=True, text=True, timeout=5,
+                                        creationflags=_cflags)
+                                    _m2 = _re.search(r'(\d+)\.\d+', _r.stdout)
+                                    if _m2: _dm = int(_m2.group(1))
+                                except Exception: pass
+                            # Edge major version — try multiple registry locations + PowerShell fallback
+                            _em = None
+                            try:
+                                import winreg as _wr
+                                _reg_targets = [
+                                    (_wr.HKEY_CURRENT_USER,  r"Software\Microsoft\Edge\BLBeacon", "version"),
+                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Edge\BLBeacon", "version"),
+                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Edge\BLBeacon", "version"),
+                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}", "pv"),
+                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}", "pv"),
+                                ]
+                                for _hive, _rk, _vname in _reg_targets:
+                                    try:
+                                        _k = _wr.OpenKey(_hive, _rk)
+                                        _v, _ = _wr.QueryValueEx(_k, _vname)
+                                        _wr.CloseKey(_k)
+                                        _em = int(_v.split(".")[0]); break
+                                    except Exception: pass
+                            except Exception: pass
+                            # PowerShell fallback: read version from Edge binary file
+                            if not _em and edge_bin and os.path.exists(edge_bin):
+                                try:
+                                    _ps = subprocess.run(
+                                        ["powershell", "-command",
+                                         f"(Get-Item '{edge_bin}').VersionInfo.ProductVersion"],
+                                        capture_output=True, text=True, timeout=8,
+                                        creationflags=_cflags)
+                                    _m3 = _re.search(r'(\d+)\.\d+', _ps.stdout.strip())
+                                    if _m3: _em = int(_m3.group(1))
+                                except Exception: pass
+                            # if driver version known but Edge version unknown → skip cache (safe default)
+                            if _dm and not _em:
+                                self.root.after(0, lambda: self.log(
+                                    "Edge version unknown — skipping cached driver, using Selenium Manager…", "WARN"))
+                                msedgedriver = None
+                            elif _dm and _em and _dm != _em:
+                                self.root.after(0, lambda dm=_dm, em=_em: self.log(
+                                    f"EdgeDriver v{dm} ≠ Edge v{em} — skipping cache, downloading v{em}…", "WARN"))
+                                msedgedriver = None
+                        except Exception:
+                            pass
                     if msedgedriver:
                         self.root.after(0, lambda d=msedgedriver: self.log(f"EdgeDriver: {d}"))
                         self.driver = webdriver.Edge(service=EService(msedgedriver), options=o)
                     else:
                         self.root.after(0, lambda: self.log(
-                            "msedgedriver not found locally — Selenium Manager will try to download it…", "WARN"))
+                            "msedgedriver not found locally — Selenium Manager will download correct version…", "WARN"))
                         self.driver = webdriver.Edge(options=o)
                 # restore saved browser window position/size
                 prefs = self._load_prefs()
