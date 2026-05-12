@@ -1,0 +1,35 @@
+Country,Channel,ID,PC,Status
+Spain,DAZN Espana OTT,3321,C07OTT,Chrome
+Spain,DAZN Espana OTT (secondary),3893,C14OTT,Edge
+Germany,DAZN,631,C277 Germany,Chrome
+Germany,DAZN (backup Germany 2),1385,C282 Germany,?
+USA,Amazon Prime US,3640,C13OTT,Both
+USA,Amazon Prime US (backup United States),4143,C13OTT,Both
+Japan,Docomo,3898,C314 Japan,Both
+Japan,Docomo (backup Japan),4209,C314 Japan,Both
+France,Amazon Prime FR,571,C05OTT,Both
+France,Amazon Prime FR (backup France),4136,C05OTT,Both
+Italy,Amazon Prime IT,901,C23OTT,Both
+Italy,Amazon Prime (backup Italy),3417,C23OTT,Both
+UK,Amazon Prime UK,1807,C06OTT,Both
+UK,Amazon Prime (backup UK),3411,C06OTT,Both
+Brazil,Amazon Prime BR,4049,C293 Brazil,Both
+Brazil,Amazon Prime BR (backup Brazil),4139,C293 Brazil,Both
+Spain,Amazon Prime ES,4058,C07OTT,Both
+Spain,Amazon Prime ES (backup Spain),4140,C07OTT,Both
+Mexico,Amazon Prime MX,4207,C211 Mexico,Edge
+Mexico,Amazon Prime MX (backup Mexico),4208,C26OTT,Edge
+Japan,Amazon Prime JP,3551,C314 Japan,Chrome
+Japan,Amazon Prime JP (backup Japan),4138,C314 Japan,?
+Germany,Amazon Prime DE,1071,C276 Germany,Edge
+Germany,Amazon Prime (backup Germany),3786,C282 Germany,Chrome
+Japan,SpoTV NOW Japan,3202,C313 Japan,Chrome
+Qatar,TOD,2600,C18OTT,Edge
+Australia,Paramount Plus,957,C12OTT,Edge
+Sweden,Disney+ Sweden,3293,C30OTT,Edge
+Denmark,Disney+ Denmark,3294,C29OTT,Edge
+Argentina,Disney+ Argentina,3466,C11OTT,Chrome
+South Korea,Coupang,1041,C43OTT,Edge
+South Korea,Coupang (backup South Korea),3862,C43OTT,?
+USA,Peacock,574,C35OTT,Edge
+USA,Peacock (backup USA),4094,C35OTT,?
