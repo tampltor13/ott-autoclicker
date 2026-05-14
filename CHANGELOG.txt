@@ -10,7 +10,7 @@ v1.0.1 — Initial release
 - XPath, CSS Selector, ID, Class Name selector types
 - Click targets (one per line)
 - Start/stop monitoring with scheduled start time
-- Timestamped log with color-coded entries
+- Timestamped log with colour-coded entries
 - Prime Video as first supported platform
 
 
@@ -345,21 +345,183 @@ v1.0.35 — DAZN video detect
 - Default: refresh_first=True, load_wait=60s, refresh every 60s (120s total cycle)
 
 
-v1.0.37 — EdgeDriver auto version check
------------------------------------------
+v1.0.36 — SPOTV Now JP default browser size
+--------------------------------------------
+- SPOTV Now JP: default browser window size set to 650×550
+- Platform rule browser_size field: overrides saved prefs when opening browser
+- All other platforms remain at 550×450 default
+
+
+v1.0.37 — EdgeDriver auto version check + DAZN ES
+---------------------------------------------------
 - EdgeDriver cache version now checked against installed Edge major version
 - If versions don't match (e.g. cached v146, Edge updated to v148): skips
   cached driver and lets Selenium Manager download the correct version
 - Version extracted from cache path or --version output; Edge version read
   from Windows registry (HKLM\SOFTWARE\Microsoft\Edge\BLBeacon)
 - No more manual cache deletion needed after Edge auto-updates
+- Added DAZN ES platform (dazn.com/en-ES/home, Edge default)
+  - Same video_detect mode as DAZN DE (load_wait 60s, refresh_first)
 
 
-v1.0.36 — SPOTV Now JP default browser size
---------------------------------------------
-- SPOTV Now JP: default browser window size set to 650×550
-- Platform rule browser_size field: overrides saved prefs when opening browser
-- All other platforms remain at 550×450 default
+v1.0.54 — EdgeDriver auto-cache
+---------------------------------
+- Nakon što Selenium Manager skine novi EdgeDriver, app ga kopira u lokalni app folder
+- Sljedeće otvaranje browsera nađe lokalni driver odmah — nema 40s čekanja
+- Kopiranje se radi samo ako verzija drivera odgovara instaliranom Edgeu
+- Greška pri kopiranju je non-fatal — tiho logira WARN i nastavlja normalno
+
+
+v1.0.53 — Simple/Advanced Mode + UI polish
+-------------------------------------------
+- Dodan gumb "Advanced" u statusnu traku (lijevo od "Compact")
+- Po defaultu app startuje u Simple modu — skriveni: Browser size, Selector,
+  Click delay, Load wait, Refresh, Scroll, Freeze Detection, Targets, separatori
+- Sakriveni gumbi u simple modu: Reposition, Kill Browser, Test Target
+- Sakriveni tabovi u simple modu: Inspector, Channels
+- Klik na "Advanced" prikazuje sve, gumb mijenja tekst u "Simple"
+- Compact Mode preimenovan u "Compact", Advanced Mode u "Advanced"
+- Compact prozor povećan: 400×60 → 500×80
+- Advanced gumb se skriva kad je Compact mode aktivan
+- Mute premješten u prvi red gumba (uz Open/Navigate/Close)
+- Reposition premješten u drugi red (uz Kill Browser, Test Target)
+- Platform dropdown: height=20 (sve platforme vidljive bez scrollanja)
+
+
+v1.0.52 — Browser size dropdown + Test Target premješten
+----------------------------------------------------------
+- Dodan "Browser size" dropdown ispod URL polja: SM (550×450), MD (650×550), LG (750×650)
+- Promjena dropdowna live-resizea browser ako je otvoren
+- SPOTV Now JP po defaultu dobiva MD, sve ostale platforme SM
+- Test Target premješten u drugi red gumba, iza Kill Browser
+
+
+v1.0.51 — Reposition browser
+------------------------------
+- Dodan gumb "Reposition" pored Close Browser
+- Vraća browser na zadnju spremljenu poziciju i veličinu iz configa
+- Ako nema spremljene pozicije, prikazuje poruku da korisnik zatvori browser normalno
+
+
+v1.0.50 — UI cleanup
+---------------------
+- Browser selector: dropdown → radio buttons (Chrome / Edge jedan pored drugog)
+- Logika defaultnog browsera po platformi ostaje ista
+- Navigate gumb: maknuta strelica → samo "Navigate"
+- Kill Browser: maknuta 💀 ikona → samo "Kill Browser"
+- Inspector tab: maknut "Save to file" gumb
+- Custom URL: maknuto iz Platform dropdowna
+- Separator dodan između Selector i Click delay sekcije u Setup tabu
+- Date fields: dodan + gumb za +1 dan pored Start/End date polja (Monitor i Freeze tab)
+
+
+v1.0.49 — Removed "Use system profile" feature
+------------------------------------------------
+- Removed "Use system profile" checkbox from Setup tab
+- Removed _on_sys_profile_toggle() and all related logic
+- Browser always uses autoclicker profile (browser_profiles/ folder)
+- Kill Browser button remains (unaffected)
+
+
+v1.0.48 — Freeze Detection improvements
+----------------------------------------
+- Added Start date/time and End date/time fields in Freeze tab
+- Auto-populated when Freeze Detection activates:
+  Start = moment monitoring stops (click succeeded)
+  End = Start + 4 hours
+- User can manually edit End time before Freeze Detection starts
+- Check interval reduced from 60s to 30s (faster freeze detection)
+- Fixed freeze detection logic: delta must be ≥80% of CHECK_INTERVAL (24s out of 30s)
+  Previously any positive delta was treated as OK — now small advances are correctly
+  detected as freezes (e.g. +6.5s in 30s → freeze)
+- Freeze Detection starts 60s after monitoring stops (initial delay preserved)
+
+
+v1.0.47 — Click delay in seconds
+----------------------------------
+- Click delay changed from milliseconds to seconds
+- Default: 1s (was 1000ms), platform defaults: 2s (was 2000ms)
+- Spinbox range: 0–300s
+- Internal: time.sleep(delay_s) instead of time.sleep(delay_ms / 1000)
+
+
+v1.0.46 — Freeze Detection UX improvements
+-------------------------------------------
+- Freeze Detection checkbox moved to same row as "Refresh BEFORE clicking"
+- DAZN DE and DAZN ES: Freeze Detection enabled by default on platform select
+- First check now happens immediately when Freeze Detection starts (no 60s initial wait)
+- Status bar shows "Freeze Detection active" while running
+
+
+v1.0.45 — Freeze Detection: smart recovery per platform
+--------------------------------------------------------
+- DAZN DE / DAZN ES: freeze recovery = "refresh_only" — page refresh is enough,
+  video resumes automatically after reload
+- All other platforms (Amazon, Peacock, etc.): freeze recovery = "remonitor" —
+  after refresh, automatically restarts click monitoring so the Watch Live /
+  Resume popup gets clicked again
+- Freeze end time preserved across remonitor cycles (stays at original start + 4h)
+- New platform rule field: freeze_recovery ("refresh_only" | "remonitor")
+
+
+v1.0.44 — Freeze Detection (experimental)
+------------------------------------------
+- Added "Freeze Detection" checkbox in Setup tab
+- After a successful click monitoring stops, Freeze Detection starts 60s later
+- Checks video.currentTime every 60s — if it hasn't advanced, treats it as a freeze
+- On freeze: refreshes the page, waits 60s, then resumes checking
+- Runs for 4 hours from the monitoring start time (auto end time)
+- New "Freeze" tab (between Monitor and Inspector) with dedicated log and Stop button
+- Auto-stops if browser is closed
+- Stop button available in Freeze tab at any time
+
+
+v1.0.43 — Kill Browser button
+------------------------------
+- Added 💀 Kill Browser button in Setup tab (second row of buttons)
+- Force-kills all Chrome or Edge processes (browser + driver) for the selected browser
+- Useful when browser hangs or won't close normally
+- Buttons reorganized into two rows: Open/Navigate/Close/Test on row 1, Mute/Kill on row 2
+
+
+v1.0.42 — Mute/Unmute browser
+------------------------------
+- Added 🔇 Mute / 🔊 Unmute toggle button in Setup tab (next to Test Target)
+- Mutes or unmutes all video and audio elements in the browser via JavaScript
+- Button label toggles between Mute and Unmute to show current state
+- Works with any platform — browser must be open
+
+
+v1.0.41 — Channels tab
+-----------------------
+- Added Channels tab (4th tab) showing all monitored channels from GitHub
+- Fetches channels.csv from GitHub on first open (lazy load) — no startup delay
+- Color-coded by browser: Chrome (yellow), Edge (blue), Both (green), ? (grey)
+- Columns: Country, Channel, ID, PC, Status
+- Refresh button to manually reload the list at any time
+- channels.csv hosted on GitHub alongside the script
+
+
+v1.0.40 — Platform list cleanup
+---------------------------------
+- Removed "Amazon Prime US" platform (duplicate of Prime Video USA)
+- Prime Video USA remains (amazon.com/gp/video/sports)
+
+
+v1.0.39 — No-sandbox mode for server/VM environments
+------------------------------------------------------
+- Added --no-sandbox and --disable-dev-shm-usage flags to both Chrome and Edge
+- Fixes "Chrome instance exited" crash on Windows Server, VMs, and restricted
+  corporate configurations where the browser sandbox cannot initialize
+
+
+v1.0.38 — Removed GPU flags from Chrome
+-----------------------------------------
+- Removed --disable-gpu, --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode from Chrome launch options
+- These flags caused "Chrome instance exited" crash on some PC configurations
+- They were originally added in v1.0.23 for World2Capture black screen but
+  never solved that issue — removed entirely
 
 
 ─────────────────────────────────────────────────────────────
