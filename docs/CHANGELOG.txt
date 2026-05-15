@@ -1,0 +1,557 @@
+OTT AutoClicker — Changelog
+===========================
+
+
+v1.0.1 — Initial release
+--------------------------
+- Basic tkinter GUI with Setup and Monitor tabs
+- Selenium 4 with Chrome support
+- Persistent Chrome profile via --user-data-dir
+- XPath, CSS Selector, ID, Class Name selector types
+- Click targets (one per line)
+- Start/stop monitoring with scheduled start time
+- Timestamped log with colour-coded entries
+- Prime Video as first supported platform
+
+
+v1.0.2 — Prime Video BR + multi-region base
+--------------------------------------------
+- Added Prime Video BR (keyword: Assista)
+- Added Prime Video IT (keyword: Guarda)
+- Added Prime Video USA (amazon.com/gp/video/sports)
+- Added Prime Video UK (amazon.co.uk)
+- Added Prime Video DE (amazon.de)
+- Added Prime Video ES
+
+
+v1.0.3 — TOD + Disney+
+------------------------
+- Added TOD platform (selector: ID, target: watch_live_click)
+- Added Disney+ platform (data-testid="playback-action-button")
+- Refresh before click: disabled by default for TOD, enabled for Prime Video and Disney+
+
+
+v1.0.4 — Edge browser support
+-------------------------------
+- Added Microsoft Edge as browser option alongside Chrome
+- Edge binary auto-detected at known Windows paths
+- Separate edge_profile folder for persistent Edge sessions
+- Fixed webdriver-manager conflict with Edge — now uses Selenium Manager directly
+
+
+v1.0.5 — Auto-update system
+-----------------------------
+- App checks GitHub on every startup for new version
+- Fetches version.txt from GitHub raw URL
+- Prompts user with Yes/No dialog if update available
+- Downloads new ott_autoclicker.py and restarts via os.execv
+- SSL certificate verification bypassed (ssl.CERT_NONE) for compatibility
+- UPDATE_VERSION_URL and UPDATE_SCRIPT_URL constants added
+
+
+v1.0.6 — UI improvements + tooltips
+--------------------------------------
+- Added Click delay (ms) spinbox with tooltip
+- Added Page-load wait (s) spinbox with tooltip
+- Added Refresh every (s) spinbox
+- Added Refresh BEFORE clicking checkbox with tooltip
+- Info icons (ⓘ) with dark tooltip popups for all settings
+- Browser + Platform moved to same row to save space
+- URL field spans full width
+- Test Target button added next to Close Browser
+- Click targets textarea height reduced to 3 lines
+
+
+v1.0.7 — Monitoring fixes
+---------------------------
+- Fixed: refresh was not actually working (was using send_keys Cmd+R, now uses driver.refresh())
+- Fixed: monitoring continued after successful click — now stops immediately when ok > 0
+- End time field: leave empty to run indefinitely
+- Removed seconds display from time fields
+
+
+v1.0.8 — Windows deployment
+-----------------------------
+- Added install.bat: checks for Python, downloads installer via curl if missing, installs selenium
+- Added run.vbs: launches app silently via WScript.Shell without terminal window
+- Fixed: pythonw not on PATH issue in VBS — switched to plain python
+- Platform default changed to empty (no platform selected on startup)
+- Window geometry: 600x350, positioned top-right corner of screen
+
+
+v1.0.9 — Prime Video JP + window polish
+-----------------------------------------
+- Added Prime Video JP (amazon.co.jp, keyword: Watch)
+- Window geometry persistence: saves/restores position via prefs.json
+- Window default position: top-right corner (screenwidth - 630, y=40)
+
+
+v1.0.10 — Version bump
+------------------------
+- Version bump for Prime Video JP release
+- version.txt updated for auto-update distribution
+
+
+v1.0.11 — Paramount+ + Event keyword + Edge defaults
+------------------------------------------------------
+- Added Paramount+ platform (paramountplus.com, Edge default)
+- Added Event keyword field: filters which event card to click by name (e.g. "Vissel Kobe")
+- Event keyword only visible when Paramount+ is selected (hidden for all other platforms)
+- Event keyword live-updates XPath in targets field as you type
+- Base targets stored per platform; keyword injected at runtime into XPath predicate
+- TOD and Paramount+ now default to Edge browser on platform select
+- Removed Apple TV+, Max, Netflix from platform list
+
+
+v1.0.12 — Event keyword polish
+--------------------------------
+- Event keyword field hidden/shown dynamically on platform change
+- Switching away from Paramount+ clears and hides keyword field
+- XPath in targets field updates in real time as keyword is typed
+- _effective_targets() simplified: reads directly from targets_text (already contains keyword)
+
+
+v1.0.13 — NBA Docomo + Scroll after click + Coupang Play
+----------------------------------------------------------
+- Added NBA Docomo platform (nba.docomo.ne.jp/schedule, Edge default)
+  - Page-load wait: 10 seconds default
+  - Scroll after click: 290px (uses document.body.scrollBy, not window.scrollBy)
+  - Click delay: 2000ms
+- Added Coupang Play platform (coupangplay.com, Chrome default)
+  - Selector: //*[@data-cy="playCtaButtonText"]
+- Added Scroll after click (px) field to Setup tab
+- Added load_wait per platform rule (page-load wait loaded from PLATFORM_RULES)
+- scroll_after and load_wait applied automatically on platform select
+
+
+v1.0.14 — Inspector tab + launcher exe
+----------------------------------------
+- Added Inspector tab (third tab, after Monitor)
+  - Injects JS click listener, captures tag/classes/href/text/data-* attributes
+  - Walks up DOM tree to find meaningful parent element
+  - Displays captures in scrollable log with color-coded keys/values
+  - Auto re-injects after page refresh or navigation
+  - Clear button + Save to file (captures.json)
+- Added AutoClicker.exe via PyInstaller (launcher only, never changes)
+- Added build_launcher.bat, launcher.py, favicon.ico
+- Added Disney+ SE (Edge default — Sweden account)
+- Window height increased to 600x400
+
+
+v1.0.15 — Rollback base + Disney+ DK
+---------------------------------------
+- Rolled back to stable base (v1.0.14 backup from GitHub)
+- Renamed Disney+ Edge to Disney+ SE
+- Added Disney+ DK (Denmark account, Edge default, same selectors)
+
+
+v1.0.16 — Disney+ AR + selector fix
+--------------------------------------
+- Added Disney+ AR (Argentina account, Chrome default)
+- Fixed Disney+ selector: removed contains(.,"CONTINUE") text filter
+  - Now uses //*[@data-testid="playback-action-button"] only
+  - Applied to all Disney+ variants (Disney+, SE, DK, AR)
+
+
+v1.0.17 — Use system profile option
+--------------------------------------
+- Added "Use system profile" checkbox in Setup tab (next to Browser dropdown)
+- When checked: Selenium uses the real Chrome/Edge User Data profile (already logged in)
+- When unchecked (default): uses browser_profiles/ folder as before
+- Warning: close regular browser before using system profile in Selenium
+
+
+v1.0.18 — Platform dropdown fixes + Amazon Prime US rename
+-----------------------------------------------------------
+- Renamed "Prime Video" to "Amazon Prime US"
+- Fixed Platform combobox alignment
+- Browser dropdown made slightly wider (width 14)
+- Platform combobox now allows typing/filtering (no longer strictly readonly)
+- Disney+ AR: default page-load wait set to 10s
+
+
+v1.0.19 — Prime Video MX
+--------------------------
+- Added Prime Video MX (primevideo.com, Edge default)
+  - Selector: contains(.,"Ver")
+
+
+v1.0.20 — Disney+ modal selector + load_wait bug fix
+------------------------------------------------------
+- All Disney+ variants (Disney+, SE, DK, AR): added modal-action-button
+  as first target, playback-action-button as fallback
+  - Handles popup ("Watch Live / Watch from Beginning") that appears
+    when not entering live immediately
+- Fixed bug: switching away from Disney+ AR (load_wait 10s) to another
+  platform no longer keeps the 10s page-load wait — resets to 5s default
+
+
+v1.0.21 — JS click fallback + NBA Docomo space-key playback
+------------------------------------------------------------
+- JS click fallback: when Selenium can't click due to overlapping element
+  (ElementClickInterceptedException), automatically retries via JavaScript
+  click which bypasses visual interception — works for all platforms
+- NBA Docomo playback sequence overhauled:
+  - Selector changed to //video-js[contains(@class,"video-js")] (VideoJS container)
+  - Sequence: refresh → load wait → scroll 290px → click video-js (focus) → space key
+  - Scroll now happens BEFORE click when key_press is configured
+  - Space key triggers live playback after video player has focus
+- key_press field added to platform rules
+
+
+v1.0.22 — Use system profile: kill browsers dialog
+---------------------------------------------------
+- "Use system profile" checkbox now shows a confirmation dialog when checked
+- Dialog offers: Kill Chrome / Kill Edge / Both / Cancel
+- Selecting Kill Chrome/Edge/Both force-closes running browser + driver processes
+  before Selenium tries to attach (prevents "profile locked" session errors)
+- Selecting Cancel reverts the checkbox to unchecked
+- Dialog centered relative to the main app window
+- Works on Windows (taskkill) and macOS (pkill)
+- Spinbox scroll px display fix: force-refreshes value on platform change
+- NBA Docomo default page-load wait reduced from 10s to 5s
+
+
+v1.0.23 — GPU compositing flags
+---------------------------------
+- Added GPU flags to reduce black screen on region capture:
+  --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode (applied to both Chrome and Edge)
+
+
+v1.0.24 — Prime Video FR + auto-update fix
+------------------------------------------
+- Added Prime Video FR (primevideo.com, Chrome default)
+  - Selectors without keyword filter: data-automation-id + data-testid only
+  - No contains() text filter — ID selectors are sufficient
+- Fixed auto-updater bug: version comparison was using != instead of >
+  - App would offer to "update" to older GitHub version if local version was newer
+  - Now uses proper tuple comparison so only genuinely newer versions trigger update
+
+
+v1.0.25 — Default browser fix per platform
+-------------------------------------------
+- Fixed: switching platforms now always resets browser to correct default
+  - Edge platforms (TOD, Paramount+, NBA Docomo, Disney+ SE/DK, Prime Video MX) → Edge
+  - All other platforms → Chrome
+  - Previously, switching from an Edge platform to a Chrome platform kept Edge selected
+
+
+v1.0.26 — Browser window position memory
+-----------------------------------------
+- Chrome and Edge browser window position/size now saved separately in prefs.json
+- On close: saves current position and size per browser (chrome_browser / edge_browser)
+- On open: restores last saved position and size for that browser
+- Default size remains 550x450 if no saved position exists yet
+- Refactored prefs.json handling: _load_prefs() and _save_prefs() helpers
+
+
+v1.0.27 — Prime Video selectors unified (no keyword filter)
+-----------------------------------------------------------
+- Removed contains() keyword filter from all Amazon Prime / Prime Video platforms:
+  Amazon Prime US, Prime Video USA, IT, BR, UK, DE, ES, JP, MX, FR
+- All now use only: //*[@data-automation-id="circular-playbutton"]
+  and //*[@data-testid="play"] — ID selectors sufficient for all regions
+- Default browser per platform remains unchanged
+
+
+v1.0.28 — IP address display
+------------------------------
+- Added IP address label at top of Setup tab
+- Shows current public IP and country on startup: e.g. "IP: 185.x.x.x  (Germany)"
+- Useful for verifying VPN is active before starting monitoring
+- Refresh button (↺) to re-fetch IP manually at any time
+- Uses ip-api.com (HTTP, no SSL issues)
+
+
+v1.0.29 — Edge driver + launcher fixes
+----------------------------------------
+- Edge binary detection: added Windows registry lookup (most reliable) + fallback
+  to %LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe as third path
+- msedgedriver lookup: searches app folder, PATH, and Selenium Manager cache
+  (~/.cache/selenium / %LOCALAPPDATA%\selenium) before falling back to Selenium
+  Manager network download — fixes Edge not opening when VPN blocks the download
+- System profile: auto-detects the last-used profile directory from Local State
+  JSON (e.g. "Profile 1" instead of hardcoded "Default") — fixes Selenium opening
+  a fresh empty profile instead of the real signed-in profile
+- GPU flags (--disable-gpu etc.) now applied to Chrome only, not Edge
+- run.vbs: finds Python via Windows registry (HKLM + HKCU, versions 3.6–3.13)
+  instead of relying on PATH — fixes app not starting after PC restart
+- Auto-update now also updates run.vbs alongside ott_autoclicker.py
+- Coupang Play default browser changed from Chrome to Edge
+
+
+v1.0.30 — Compact Mode
+------------------------
+- Added Compact Mode button in status bar (bottom right)
+- Clicking "Compact Mode" hides the notebook tabs and shrinks the window to a
+  minimal bar showing only status + last log line
+- Status bar (with "Expand" button) always remains visible in compact mode
+- Clicking "Expand" restores the full window to its original size and position
+
+
+v1.0.31 — SPOTV Now JP
+------------------------
+- Added SPOTV Now JP platform (spotvnow.jp/schedule/0, Chrome default)
+- Event keyword field (same as Paramount+): type team name to target that
+  specific match row — e.g. "Cleveland Guardians"
+- Page-load wait: 8s (SPA needs time to render the schedule)
+- Selector targets view-box live class (live matches only, not reservations)
+- Post-click popup handling: after clicking the live button, waits 4s and
+  automatically clicks the "リアルタイムで視聴" (watch live) confirmation button
+  if it appears — skips silently if popup is not present
+
+
+v1.0.32 — SPOTV Now JP Ctrl+click (open in tab)
+-------------------------------------------------
+- SPOTV Now JP: click changed to Ctrl+click so live page opens in a new
+  browser tab (same window) instead of a new popup window
+- New platform rule field: ctrl_click — when True, uses ActionChains
+  key_down(CTRL) → click → key_up(CTRL) instead of regular Selenium click
+- New platform rule field: post_switch_wait — extra wait (seconds) after
+  switching to the new tab, before clicking the post-click popup target
+- SPOTV Now JP timing: 3s wait → switch to new tab → 3s wait → click popup
+- post_switch_wait added to _loop() between tab switch and post_click_targets
+- ctrl_click and post_switch_wait default to False/0 — no other platforms affected
+
+
+v1.0.33 — Auto-recover from closed live tab
+--------------------------------------------
+- Fixed: if the live tab was closed after a successful SPOTV click, the next
+  monitoring cycle would crash with "no such window: target window already closed"
+- _loop() now checks at the start of each cycle if the driver is still on a
+  valid window — if not, automatically switches back to window_handles[0]
+  (the schedule tab) and logs "switched back to main tab"
+- Works for any platform that opens a second tab/window during monitoring
+
+
+v1.0.34 — Peacock
+------------------
+- Added Peacock platform (peacocktv.com, Edge default)
+- Selector: //*[@data-testid="watch-button"] (Watch Now button)
+- URL: set manually to the specific event page before monitoring
+- refresh_first: True, click_delay: 2000ms, load_wait: 10s
+
+
+v1.0.35 — DAZN video detect
+-----------------------------
+- Added DAZN DE platform (dazn.com/en-DE/home, Chrome default)
+- New "video_detect" mode: no click target needed — refreshes page and checks
+  via JavaScript whether a video element has started playing
+- JS condition checked each cycle: video not paused, no error, currentTime > 0,
+  readyState >= 3 (HAVE_FUTURE_DATA) — monitoring stops when all are true
+- JS hardcoded in platform rule (video_detect_js field) — not exposed in UI
+- start_monitoring() skips "no targets" warning when video_detect mode is active
+- Default: refresh_first=True, load_wait=60s, refresh every 60s (120s total cycle)
+
+
+v1.0.36 — SPOTV Now JP default browser size
+--------------------------------------------
+- SPOTV Now JP: default browser window size set to 650×550
+- Platform rule browser_size field: overrides saved prefs when opening browser
+- All other platforms remain at 550×450 default
+
+
+v1.0.37 — EdgeDriver auto version check + DAZN ES
+---------------------------------------------------
+- EdgeDriver cache version now checked against installed Edge major version
+- If versions don't match (e.g. cached v146, Edge updated to v148): skips
+  cached driver and lets Selenium Manager download the correct version
+- Version extracted from cache path or --version output; Edge version read
+  from Windows registry (HKLM\SOFTWARE\Microsoft\Edge\BLBeacon)
+- No more manual cache deletion needed after Edge auto-updates
+- Added DAZN ES platform (dazn.com/en-ES/home, Edge default)
+  - Same video_detect mode as DAZN DE (load_wait 60s, refresh_first)
+
+
+v1.0.54 — EdgeDriver auto-cache
+---------------------------------
+- Nakon što Selenium Manager skine novi EdgeDriver, app ga kopira u lokalni app folder
+- Sljedeće otvaranje browsera nađe lokalni driver odmah — nema 40s čekanja
+- Kopiranje se radi samo ako verzija drivera odgovara instaliranom Edgeu
+- Greška pri kopiranju je non-fatal — tiho logira WARN i nastavlja normalno
+
+
+v1.0.53 — Simple/Advanced Mode + UI polish
+-------------------------------------------
+- Dodan gumb "Advanced" u statusnu traku (lijevo od "Compact")
+- Po defaultu app startuje u Simple modu — skriveni: Browser size, Selector,
+  Click delay, Load wait, Refresh, Scroll, Freeze Detection, Targets, separatori
+- Sakriveni gumbi u simple modu: Reposition, Kill Browser, Test Target
+- Sakriveni tabovi u simple modu: Inspector, Channels
+- Klik na "Advanced" prikazuje sve, gumb mijenja tekst u "Simple"
+- Compact Mode preimenovan u "Compact", Advanced Mode u "Advanced"
+- Compact prozor povećan: 400×60 → 500×80
+- Advanced gumb se skriva kad je Compact mode aktivan
+- Mute premješten u prvi red gumba (uz Open/Navigate/Close)
+- Reposition premješten u drugi red (uz Kill Browser, Test Target)
+- Platform dropdown: height=20 (sve platforme vidljive bez scrollanja)
+
+
+v1.0.52 — Browser size dropdown + Test Target premješten
+----------------------------------------------------------
+- Dodan "Browser size" dropdown ispod URL polja: SM (550×450), MD (650×550), LG (750×650)
+- Promjena dropdowna live-resizea browser ako je otvoren
+- SPOTV Now JP po defaultu dobiva MD, sve ostale platforme SM
+- Test Target premješten u drugi red gumba, iza Kill Browser
+
+
+v1.0.51 — Reposition browser
+------------------------------
+- Dodan gumb "Reposition" pored Close Browser
+- Vraća browser na zadnju spremljenu poziciju i veličinu iz configa
+- Ako nema spremljene pozicije, prikazuje poruku da korisnik zatvori browser normalno
+
+
+v1.0.50 — UI cleanup
+---------------------
+- Browser selector: dropdown → radio buttons (Chrome / Edge jedan pored drugog)
+- Logika defaultnog browsera po platformi ostaje ista
+- Navigate gumb: maknuta strelica → samo "Navigate"
+- Kill Browser: maknuta 💀 ikona → samo "Kill Browser"
+- Inspector tab: maknut "Save to file" gumb
+- Custom URL: maknuto iz Platform dropdowna
+- Separator dodan između Selector i Click delay sekcije u Setup tabu
+- Date fields: dodan + gumb za +1 dan pored Start/End date polja (Monitor i Freeze tab)
+
+
+v1.0.49 — Removed "Use system profile" feature
+------------------------------------------------
+- Removed "Use system profile" checkbox from Setup tab
+- Removed _on_sys_profile_toggle() and all related logic
+- Browser always uses autoclicker profile (browser_profiles/ folder)
+- Kill Browser button remains (unaffected)
+
+
+v1.0.48 — Freeze Detection improvements
+----------------------------------------
+- Added Start date/time and End date/time fields in Freeze tab
+- Auto-populated when Freeze Detection activates:
+  Start = moment monitoring stops (click succeeded)
+  End = Start + 4 hours
+- User can manually edit End time before Freeze Detection starts
+- Check interval reduced from 60s to 30s (faster freeze detection)
+- Fixed freeze detection logic: delta must be ≥80% of CHECK_INTERVAL (24s out of 30s)
+  Previously any positive delta was treated as OK — now small advances are correctly
+  detected as freezes (e.g. +6.5s in 30s → freeze)
+- Freeze Detection starts 60s after monitoring stops (initial delay preserved)
+
+
+v1.0.47 — Click delay in seconds
+----------------------------------
+- Click delay changed from milliseconds to seconds
+- Default: 1s (was 1000ms), platform defaults: 2s (was 2000ms)
+- Spinbox range: 0–300s
+- Internal: time.sleep(delay_s) instead of time.sleep(delay_ms / 1000)
+
+
+v1.0.46 — Freeze Detection UX improvements
+-------------------------------------------
+- Freeze Detection checkbox moved to same row as "Refresh BEFORE clicking"
+- DAZN DE and DAZN ES: Freeze Detection enabled by default on platform select
+- First check now happens immediately when Freeze Detection starts (no 60s initial wait)
+- Status bar shows "Freeze Detection active" while running
+
+
+v1.0.45 — Freeze Detection: smart recovery per platform
+--------------------------------------------------------
+- DAZN DE / DAZN ES: freeze recovery = "refresh_only" — page refresh is enough,
+  video resumes automatically after reload
+- All other platforms (Amazon, Peacock, etc.): freeze recovery = "remonitor" —
+  after refresh, automatically restarts click monitoring so the Watch Live /
+  Resume popup gets clicked again
+- Freeze end time preserved across remonitor cycles (stays at original start + 4h)
+- New platform rule field: freeze_recovery ("refresh_only" | "remonitor")
+
+
+v1.0.44 — Freeze Detection (experimental)
+------------------------------------------
+- Added "Freeze Detection" checkbox in Setup tab
+- After a successful click monitoring stops, Freeze Detection starts 60s later
+- Checks video.currentTime every 60s — if it hasn't advanced, treats it as a freeze
+- On freeze: refreshes the page, waits 60s, then resumes checking
+- Runs for 4 hours from the monitoring start time (auto end time)
+- New "Freeze" tab (between Monitor and Inspector) with dedicated log and Stop button
+- Auto-stops if browser is closed
+- Stop button available in Freeze tab at any time
+
+
+v1.0.43 — Kill Browser button
+------------------------------
+- Added 💀 Kill Browser button in Setup tab (second row of buttons)
+- Force-kills all Chrome or Edge processes (browser + driver) for the selected browser
+- Useful when browser hangs or won't close normally
+- Buttons reorganized into two rows: Open/Navigate/Close/Test on row 1, Mute/Kill on row 2
+
+
+v1.0.42 — Mute/Unmute browser
+------------------------------
+- Added 🔇 Mute / 🔊 Unmute toggle button in Setup tab (next to Test Target)
+- Mutes or unmutes all video and audio elements in the browser via JavaScript
+- Button label toggles between Mute and Unmute to show current state
+- Works with any platform — browser must be open
+
+
+v1.0.41 — Channels tab
+-----------------------
+- Added Channels tab (4th tab) showing all monitored channels from GitHub
+- Fetches channels.csv from GitHub on first open (lazy load) — no startup delay
+- Color-coded by browser: Chrome (yellow), Edge (blue), Both (green), ? (grey)
+- Columns: Country, Channel, ID, PC, Status
+- Refresh button to manually reload the list at any time
+- channels.csv hosted on GitHub alongside the script
+
+
+v1.0.40 — Platform list cleanup
+---------------------------------
+- Removed "Amazon Prime US" platform (duplicate of Prime Video USA)
+- Prime Video USA remains (amazon.com/gp/video/sports)
+
+
+v1.0.39 — No-sandbox mode for server/VM environments
+------------------------------------------------------
+- Added --no-sandbox and --disable-dev-shm-usage flags to both Chrome and Edge
+- Fixes "Chrome instance exited" crash on Windows Server, VMs, and restricted
+  corporate configurations where the browser sandbox cannot initialize
+
+
+v1.0.38 — Removed GPU flags from Chrome
+-----------------------------------------
+- Removed --disable-gpu, --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode from Chrome launch options
+- These flags caused "Chrome instance exited" crash on some PC configurations
+- They were originally added in v1.0.23 for World2Capture black screen but
+  never solved that issue — removed entirely
+
+
+─────────────────────────────────────────────────────────────
+  PREVIEW / REVERTED — istraživanje black screen problema
+─────────────────────────────────────────────────────────────
+
+[PREVIEW] v1.0.34 — GPU flagovi za Chrome (reverted)
+------------------------------------------------------
+Cilj: popraviti crni ekran u World2Capture region/window capture.
+Isprobano redom:
+- --disable-gpu, --disable-gpu-compositing, --disable-accelerated-2d-canvas,
+  --disable-accelerated-video-decode (od v1.0.23, ostalo aktivno)
+- --use-gl=swiftshader (potpuni software renderer, zaobilazi GPU/ANGLE/D3D)
+- --use-angle=swiftshader (forsira ANGLE software path)
+- --disable-features=VizDisplayCompositor
+Zaključak: nijedan flag nije pomogao. Problem nije u GPU flagovima nego u
+načinu na koji Selenium pokreće Chrome (--remote-debugging-port CDP konekcija
+mijenja DWM kompoziciju prozora). Reverted.
+
+
+[PREVIEW] v1.0.35 — Chrome subprocess launch (reverted)
+---------------------------------------------------------
+Cilj: pokrenuti Chrome kao normalan OS subprocess (ne preko Selenium
+webdriver.Chrome()) pa da World2Capture može čitati prozor.
+Implementirano:
+- subprocess.Popen(chrome.exe --remote-debugging-port=9222 ...)
+- čeka 3s → Selenium se spaja via debuggerAddress CDP
+- Connect button za spajanje na već-otvoreni Chrome
+- chrome_proc cleanup u close_browser()
+Potvrđeno: --remote-debugging-port sam po sebi NE kvari World2Capture
+capture (testom ručnog pokretanja Chrome s flagom capture je radio).
+Problem: kompleksnost spajanja, Chrome ignorira flag ako je već pokrenut,
+korisnik mora killati sve chrome.exe procese. Reverted, nastavlja se kasnije.
