@@ -1,0 +1,5 @@
+# OTT AutoClicker – Python dependencies
+# Install with:  pip install -r requirements.txt
+
+selenium>=4.18.0        # browser automation (Selenium 4 auto-downloads ChromeDriver/EdgeDriver)
+tkcalendar>=1.6.1       # optional – nicer date picker in the UI
