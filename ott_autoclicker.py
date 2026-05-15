@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.54"
+VERSION = "1.0.55"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -1194,7 +1194,10 @@ class App:
         elif name:
             self.browser_size_var.set("SM — 550×450")
         # freeze detection default per platform
-        if name in ("DAZN DE", "DAZN ES"):
+        if name in ("DAZN DE", "DAZN ES",
+                    "Prime Video USA", "Prime Video IT", "Prime Video BR",
+                    "Prime Video UK", "Prime Video DE", "Prime Video ES",
+                    "Prime Video JP", "Prime Video MX", "Prime Video FR"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
