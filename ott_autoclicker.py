@@ -35,24 +35,25 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.37"
+VERSION = "1.0.54"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
 UPDATE_VBS_URL     = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/run.vbs"
+CHANNELS_URL       = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/channels.csv"
 
 PLATFORMS = {
-    "Amazon Prime US": "https://www.primevideo.com",
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
-    "Prime Video UK":  "https://www.amazon.co.uk/",
+    "Prime Video UK":  "https://www.amazon.co.uk/gp/video",
     "Prime Video DE":  "https://www.amazon.de/gp/video/sports",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
     "Prime Video FR": "https://www.primevideo.com",
     "DAZN DE":      "https://www.dazn.com/en-DE/home",
+    "DAZN ES":      "https://www.dazn.com/en-ES/home",
     "Peacock":      "https://www.peacocktv.com/watch/home",
     "Coupang Play": "https://www.coupangplay.com",
     "SPOTV Now JP": "https://spotvnow.jp/schedule/0",
@@ -63,82 +64,84 @@ PLATFORMS = {
     "Disney+ SE": "https://www.disneyplus.com/home",
     "Disney+ DK": "https://www.disneyplus.com/home",
     "Disney+ AR": "https://www.disneyplus.com/home",
-    "Custom URL":  "",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
-    "Amazon Prime US": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
-    },
     "Prime Video USA": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video IT": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video BR": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video UK": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video DE": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video ES": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video JP": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video MX": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Prime Video FR": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
-        "refresh_first": True,
-        "click_delay":   2000,
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
     },
     "Peacock": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="watch-button"]',
         "refresh_first": True,
-        "click_delay":   2000,
+        "click_delay":   2,
         "load_wait":     10,
     },
     "Coupang Play": {
         "selector":      "XPath",
         "targets":       '//*[@data-cy="playCtaButtonText"]',
         "refresh_first": True,
-        "click_delay":   2000,
+        "click_delay":   2,
     },
     "SPOTV Now JP": {
         "selector":           "XPath",
@@ -149,7 +152,7 @@ PLATFORM_RULES = {
         "prevent_new_window": True,
         "ctrl_click":         True,
         "refresh_first":      True,
-        "click_delay":        2000,
+        "click_delay":        2,
         "load_wait":          8,
         "browser_size":       (650, 550),
     },
@@ -157,7 +160,7 @@ PLATFORM_RULES = {
         "selector":      "XPath",
         "targets":       '//video-js[contains(@class,"video-js")]',
         "refresh_first": True,
-        "click_delay":   2000,
+        "click_delay":   2,
         "scroll_after":  290,
         "load_wait":     5,
         "key_press":     " ",
@@ -166,7 +169,7 @@ PLATFORM_RULES = {
         "selector":      "XPath",
         "targets":       '//article[contains(@class,"live-event")]//a',
         "refresh_first": True,
-        "click_delay":   2000,
+        "click_delay":   2,
     },
     "Disney+": {
         "selector":      "XPath",
@@ -199,6 +202,14 @@ PLATFORM_RULES = {
         "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
         "refresh_first":   True,
         "load_wait":       60,
+        "freeze_recovery": "refresh_only",
+    },
+    "DAZN ES": {
+        "video_detect":    True,
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":   True,
+        "load_wait":       60,
+        "freeze_recovery": "refresh_only",
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -288,24 +299,36 @@ class App:
         self._full_geometry = None
         self._compact_log_var = tk.StringVar(value="")
 
+
         self._status_bar = ttk.Frame(self.root, relief="sunken")
         self._status_bar.pack(fill="x", side="bottom")
         self.status_var = tk.StringVar(value="Ready")
-        self._compact_btn = ttk.Button(self._status_bar, text="Compact Mode",
+        self._compact_btn = ttk.Button(self._status_bar, text="Compact",
                                        command=self._toggle_compact)
-        self._compact_btn.pack(side="right", padx=4, pady=1)
+        self._compact_btn.pack(side="right", padx=4, pady=5)
+        self._advanced_mode = False
+        self._adv_btn = ttk.Button(self._status_bar, text="Advanced",
+                                   command=self._toggle_advanced)
+        self._adv_btn.pack(side="right", padx=(4, 0), pady=5)
         ttk.Label(self._status_bar, textvariable=self.status_var).pack(
-            anchor="w", padx=6, pady=2, side="left")
+            anchor="w", padx=6, pady=6, side="left")
 
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill="both", expand=True, padx=6, pady=6)
 
         t1 = ttk.Frame(self.nb); self.nb.add(t1, text="  Setup  ")
         t2 = ttk.Frame(self.nb); self.nb.add(t2, text="  Monitor  ")
+        t_freeze = ttk.Frame(self.nb); self.nb.add(t_freeze, text="  Freeze  ")
         t3 = ttk.Frame(self.nb); self.nb.add(t3, text="  Inspector  ")
+        t4 = ttk.Frame(self.nb); self.nb.add(t4, text="  Channels  ")
+        self._tab_inspector = t3
+        self._tab_channels  = t4
         self._setup_tab(t1)
         self._monitor_tab(t2)
+        self._freeze_tab(t_freeze)
         self._inspector_tab(t3)
+        self._channels_tab(t4)
+        self.nb.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         # compact mode frame (hidden by default)
         self._compact_frame = tk.Frame(self.root)
@@ -330,26 +353,18 @@ class App:
                    command=lambda: threading.Thread(target=self._fetch_ip, daemon=True).start()
                    ).pack(side="left", padx=(6, 0))
         r += 1
-        # browser + platform u istom redu
+        # browser radio buttons
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
         self.browser_var = tk.StringVar(value="Chrome")
-        ttk.Combobox(p, textvariable=self.browser_var,
-                     values=["Chrome","Edge"], state="readonly", width=14
-                     ).grid(row=r, column=1, sticky="w", padx=8)
-        self.sys_profile_var = tk.BooleanVar(value=False)
-        sp_cb = ttk.Checkbutton(p, text="Use system profile", variable=self.sys_profile_var,
-                                command=self._on_sys_profile_toggle)
-        sp_cb.grid(row=r, column=2, sticky="w", pady=3)
-        i_sp = ttk.Label(p, text=" ⓘ", foreground="#888888", cursor="hand2")
-        i_sp.grid(row=r, column=3, sticky="w")
-        Tooltip(i_sp, "Use your real Chrome/Edge profile (already logged in).\n"
-                      "Close the browser before opening it here.\n"
-                      "Default (unchecked) uses the separate AutoClicker profile."); r += 1
+        f_br = ttk.Frame(p); f_br.grid(row=r, column=1, columnspan=3, sticky="w", padx=8)
+        ttk.Radiobutton(f_br, text="Chrome", variable=self.browser_var, value="Chrome").pack(side="left")
+        ttk.Radiobutton(f_br, text="Edge",   variable=self.browser_var, value="Edge"  ).pack(side="left", padx=(12, 0))
+        r += 1
 
         ttk.Label(p, text="Platform:").grid(row=r, column=0, sticky="w", pady=3)
         self.platform_var = tk.StringVar(value="")
         cb = ttk.Combobox(p, textvariable=self.platform_var,
-                          values=list(PLATFORMS.keys()), state="readonly", width=22)
+                          values=list(PLATFORMS.keys()), state="readonly", width=22, height=20)
         cb.grid(row=r, column=1, columnspan=3, sticky="w", padx=8)
         cb.bind("<<ComboboxSelected>>", self._platform_changed); r += 1
 
@@ -359,23 +374,51 @@ class App:
         ttk.Entry(p, textvariable=self.url_var, width=50).grid(
             row=r, column=1, columnspan=3, sticky="ew", padx=8); r += 1
 
-        # buttons
-        bf = ttk.Frame(p); bf.grid(row=r, column=0, columnspan=4,
-                                    sticky="w", pady=(4,8)); r += 1
-        ttk.Button(bf, text="Open Browser",  command=self.open_browser ).pack(side="left", padx=(0,4))
-        ttk.Button(bf, text="Navigate →",    command=self.navigate     ).pack(side="left", padx=(0,4))
-        ttk.Button(bf, text="Close Browser", command=self.close_browser).pack(side="left", padx=(0,4))
-        ttk.Button(bf, text="Test Target",   command=self.test_targets ).pack(side="left")
+        # browser size dropdown (advanced only)
+        _lbs = ttk.Label(p, text="Browser size:"); _lbs.grid(row=r, column=0, sticky="w", pady=3)
+        self.browser_size_var = tk.StringVar(value="SM — 550×450")
+        _cbs = ttk.Combobox(p, textvariable=self.browser_size_var,
+                     values=["SM — 550×450", "MD — 650×550", "LG — 750×650"],
+                     state="readonly", width=16)
+        _cbs.grid(row=r, column=1, sticky="w", padx=8)
+        self.browser_size_var.trace_add("write", self._on_browser_size_changed)
+        self._adv_widgets = [(_lbs, "grid"), (_cbs, "grid")]
+        r += 1
 
-        ttk.Separator(p, orient="horizontal").grid(
-            row=r, column=0, columnspan=4, sticky="ew", pady=4); r += 1
+        # buttons — row 1
+        bf = ttk.Frame(p); bf.grid(row=r, column=0, columnspan=4,
+                                    sticky="w", pady=(4,0)); r += 1
+        ttk.Button(bf, text="Open Browser",  command=self.open_browser  ).pack(side="left", padx=(0,4))
+        ttk.Button(bf, text="Navigate",      command=self.navigate      ).pack(side="left", padx=(0,4))
+        ttk.Button(bf, text="Close Browser", command=self.close_browser ).pack(side="left", padx=(0,4))
+        self._muted = False
+        self._mute_btn = ttk.Button(bf, text="🔇 Mute", command=self._toggle_mute)
+        self._mute_btn.pack(side="left", padx=(0,4))
+        # buttons — row 2
+        bf2 = ttk.Frame(p); bf2.grid(row=r, column=0, columnspan=4,
+                                      sticky="w", pady=(2,8)); r += 1
+        self._adv_reposition_btn = ttk.Button(bf2, text="Reposition", command=self._reposition_browser)
+        self._adv_reposition_btn.pack(side="left", padx=(0,4))
+        self._adv_widgets.append((self._adv_reposition_btn, "pack"))
+        self._adv_kill_btn = ttk.Button(bf2, text="Kill Browser", command=self._kill_browser)
+        self._adv_kill_btn.pack(side="left", padx=(0,4))
+        self._adv_widgets.append((self._adv_kill_btn, "pack"))
+        self._adv_test_btn = ttk.Button(bf2, text="Test Target", command=self.test_targets)
+        self._adv_test_btn.pack(side="left")
+        self._adv_widgets.append((self._adv_test_btn, "pack"))
+
+        _sep1 = ttk.Separator(p, orient="horizontal")
+        _sep1.grid(row=r, column=0, columnspan=4, sticky="ew", pady=4)
+        self._adv_widgets.append((_sep1, "grid")); r += 1
 
         # click targets
-        ttk.Label(p, text="Click targets (one per line):").grid(
-            row=r, column=0, columnspan=4, sticky="w", pady=(6,2)); r += 1
+        _lct = ttk.Label(p, text="Click targets (one per line):")
+        _lct.grid(row=r, column=0, columnspan=4, sticky="w", pady=(6,2))
+        self._adv_widgets.append((_lct, "grid")); r += 1
         self.targets_text = scrolledtext.ScrolledText(p, width=44, height=3,
                                                        font=MONO_FONT)
         self.targets_text.grid(row=r, column=0, columnspan=4, sticky="ew")
+        self._adv_widgets.append((self.targets_text, "grid"))
         self.targets_text.insert("1.0", "fbl-play-btn\n"); r += 1
 
         # event keyword filter (shown only for Paramount+)
@@ -403,29 +446,36 @@ class App:
         self._ctrl_click         = False
         self._video_detect       = False
         self._video_detect_js    = ""
+        self._freeze_recovery    = "refresh_only"
         r += 1
 
         # selector type
-        ttk.Label(p, text="Selector:").grid(row=r, column=0, sticky="w", pady=3)
+        _lsel = ttk.Label(p, text="Selector:"); _lsel.grid(row=r, column=0, sticky="w", pady=3)
         self.sel_var = tk.StringVar(value="Class Name")
         sf = ttk.Frame(p); sf.grid(row=r, column=1, columnspan=3, sticky="w", padx=8)
         for s in SELECTOR_LABELS:
             ttk.Radiobutton(sf, text=s, variable=self.sel_var,
                             value=s).pack(side="left", padx=2); r += 1
+        self._adv_widgets += [(_lsel, "grid"), (sf, "grid")]
+
+        # divider
+        _sep2 = ttk.Separator(p, orient="horizontal")
+        _sep2.grid(row=r, column=0, columnspan=4, sticky="ew", pady=6)
+        self._adv_widgets.append((_sep2, "grid")); r += 1
 
         # delays
-        ttk.Label(p, text="Click delay (ms):").grid(row=r, column=0, sticky="w", pady=3)
-        self.delay_var = tk.IntVar(value=1000)
+        _ldelay = ttk.Label(p, text="Click delay (s):"); _ldelay.grid(row=r, column=0, sticky="w", pady=3)
+        self.delay_var = tk.IntVar(value=1)
         f_delay = ttk.Frame(p); f_delay.grid(row=r, column=1, sticky="w", padx=8)
-        tk.Spinbox(f_delay, from_=0, to=30000, textvariable=self.delay_var,
+        tk.Spinbox(f_delay, from_=0, to=300, textvariable=self.delay_var,
                    width=8, bg="#3c3c3c", fg="#ffffff",
                    buttonbackground="#555555", insertbackground="#ffffff").pack(side="left")
         i1 = ttk.Label(f_delay, text=" ⓘ", foreground="#888888", cursor="hand2")
         i1.pack(side="left")
         Tooltip(i1, "Pause between clicks when you have multiple targets.\n"
-                    "e.g. 800ms = waits 0.8s between each click.")
+                    "e.g. 2 = waits 2s between each click.")
 
-        ttk.Label(p, text="Page-load wait (s):").grid(row=r, column=2, sticky="w")
+        _lload = ttk.Label(p, text="Page-load wait (s):"); _lload.grid(row=r, column=2, sticky="w")
         self.load_var = tk.IntVar(value=5)
         f_load = ttk.Frame(p); f_load.grid(row=r, column=3, sticky="w")
         tk.Spinbox(f_load, from_=0, to=60, textvariable=self.load_var,
@@ -435,10 +485,12 @@ class App:
         i2.pack(side="left")
         Tooltip(i2, "Seconds to wait after refresh before looking for the element.\n"
                     "Gives the page time to load.\n"
-                    "Increase if your internet is slow."); r += 1
+                    "Increase if your internet is slow.")
+        self._adv_widgets += [(_ldelay, "grid"), (f_delay, "grid"), (_lload, "grid"), (f_load, "grid")]
+        r += 1
 
         # refresh
-        ttk.Label(p, text="Refresh every (s):").grid(row=r, column=0, sticky="w", pady=3)
+        _lref = ttk.Label(p, text="Refresh every (s):"); _lref.grid(row=r, column=0, sticky="w", pady=3)
         self.refresh_var = tk.IntVar(value=60)
         f_refresh = ttk.Frame(p); f_refresh.grid(row=r, column=1, sticky="w", padx=8)
         tk.Spinbox(f_refresh, from_=0, to=86400, textvariable=self.refresh_var,
@@ -455,10 +507,12 @@ class App:
         i4 = ttk.Label(f_rf, text=" ⓘ", foreground="#888888", cursor="hand2")
         i4.pack(side="left")
         Tooltip(i4, "If checked: refreshes the page first, then looks for the button.\n"
-                    "If unchecked: looks for the button first, refreshes at end of cycle."); r += 1
+                    "If unchecked: looks for the button first, refreshes at end of cycle.")
+        self._adv_widgets += [(_lref, "grid"), (f_refresh, "grid"), (f_rf, "grid")]
+        r += 1
 
-        # scroll after click
-        ttk.Label(p, text="Scroll after click (px):").grid(row=r, column=0, sticky="w", pady=3)
+        # scroll after click + freeze detection (same row, left/right columns)
+        _lscroll = ttk.Label(p, text="Scroll after click (px):"); _lscroll.grid(row=r, column=0, sticky="w", pady=3)
         self.scroll_after_var = tk.IntVar(value=0)
         f_scroll = ttk.Frame(p); f_scroll.grid(row=r, column=1, sticky="w", padx=8)
         self.scroll_after_spin = tk.Spinbox(f_scroll, from_=0, to=5000, textvariable=self.scroll_after_var,
@@ -469,10 +523,24 @@ class App:
         i5.pack(side="left")
         Tooltip(i5, "Pixels to scroll down after a successful click.\n"
                     "Use to bring the video player into view.\n"
-                    "0 = no scroll."); r += 1
+                    "0 = no scroll.")
+        self.freeze_detect_var = tk.BooleanVar(value=False)
+        f_fd = ttk.Frame(p); f_fd.grid(row=r, column=2, columnspan=2, sticky="w")
+        ttk.Checkbutton(f_fd, text="Freeze Detection",
+                        variable=self.freeze_detect_var).pack(side="left")
+        i_fd = ttk.Label(f_fd, text=" ⓘ", foreground="#888888", cursor="hand2")
+        i_fd.pack(side="left")
+        Tooltip(i_fd, "After a successful click, starts monitoring video playback.\n"
+                      "Checks every 60s if video is still playing (via currentTime).\n"
+                      "If frozen or errored, refreshes the page automatically.\n"
+                      "Runs for 4 hours from monitoring start time.")
+        self._adv_widgets += [(_lscroll, "grid"), (f_scroll, "grid"), (f_fd, "grid")]
+        r += 1
 
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
+        self._advanced_mode = True   # trick toggle into going simple on first call
+        self._toggle_advanced()      # start in simple mode — must be after all widgets are created
 
     # ── MONITOR TAB ──────────────────────────────────────────────────────────
     def _monitor_tab(self, parent):
@@ -484,8 +552,10 @@ class App:
 
         ttk.Label(p, text="Start date:").grid(row=r, column=0, sticky="w", pady=3)
         self.start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
-        ttk.Entry(p, textvariable=self.start_date, width=11).grid(
-            row=r, column=1, sticky="w", padx=8)
+        sd_frame = ttk.Frame(p); sd_frame.grid(row=r, column=1, sticky="w", padx=8)
+        ttk.Entry(sd_frame, textvariable=self.start_date, width=11).pack(side="left")
+        ttk.Button(sd_frame, text="+", width=2,
+                   command=lambda: self._shift_date(self.start_date, +1)).pack(side="left", padx=(3, 0))
         ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
         self.start_time = tk.StringVar(value=now.strftime("%H:%M"))
         st_frame = ttk.Frame(p)
@@ -496,8 +566,10 @@ class App:
 
         ttk.Label(p, text="End date:").grid(row=r, column=0, sticky="w", pady=3)
         self.end_date = tk.StringVar(value="")
-        ttk.Entry(p, textvariable=self.end_date, width=11).grid(
-            row=r, column=1, sticky="w", padx=8)
+        ed_frame = ttk.Frame(p); ed_frame.grid(row=r, column=1, sticky="w", padx=8)
+        ttk.Entry(ed_frame, textvariable=self.end_date, width=11).pack(side="left")
+        ttk.Button(ed_frame, text="+", width=2,
+                   command=lambda: self._shift_date(self.end_date, +1)).pack(side="left", padx=(3, 0))
         ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
         self.end_time = tk.StringVar(value="")
         ttk.Entry(p, textvariable=self.end_time, width=6).grid(
@@ -536,6 +608,235 @@ class App:
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
 
+    # ── FREEZE TAB ───────────────────────────────────────────────────────────
+    def _freeze_tab(self, parent):
+        p = ttk.Frame(parent, padding=12)
+        p.pack(fill="both", expand=True)
+
+        # date/time fields
+        gf = ttk.Frame(p); gf.pack(fill="x", pady=(0, 6))
+        now = datetime.datetime.now()
+
+        ttk.Label(gf, text="Start date:").grid(row=0, column=0, sticky="w", pady=3)
+        self._freeze_start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
+        fsd_frame = ttk.Frame(gf); fsd_frame.grid(row=0, column=1, sticky="w", padx=8)
+        ttk.Entry(fsd_frame, textvariable=self._freeze_start_date, width=11).pack(side="left")
+        ttk.Button(fsd_frame, text="+", width=2,
+                   command=lambda: self._shift_date(self._freeze_start_date, +1)).pack(side="left", padx=(3, 0))
+        ttk.Label(gf, text="Time (HH:MM):").grid(row=0, column=2, sticky="w")
+        self._freeze_start_time = tk.StringVar(value=now.strftime("%H:%M"))
+        ttk.Entry(gf, textvariable=self._freeze_start_time, width=6).grid(row=0, column=3, sticky="w", padx=8)
+
+        ttk.Label(gf, text="End date:").grid(row=1, column=0, sticky="w", pady=3)
+        self._freeze_end_date = tk.StringVar(value="")
+        fed_frame = ttk.Frame(gf); fed_frame.grid(row=1, column=1, sticky="w", padx=8)
+        ttk.Entry(fed_frame, textvariable=self._freeze_end_date, width=11).pack(side="left")
+        ttk.Button(fed_frame, text="+", width=2,
+                   command=lambda: self._shift_date(self._freeze_end_date, +1)).pack(side="left", padx=(3, 0))
+        ttk.Label(gf, text="Time (HH:MM):").grid(row=1, column=2, sticky="w")
+        self._freeze_end_time = tk.StringVar(value="")
+        ttk.Entry(gf, textvariable=self._freeze_end_time, width=6).grid(row=1, column=3, sticky="w", padx=8)
+
+        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=(4, 6))
+
+        # status + buttons
+        bf = ttk.Frame(p); bf.pack(fill="x", pady=(0, 4))
+        self._freeze_status_var = tk.StringVar(value="Freeze Detection inactive")
+        ttk.Label(bf, textvariable=self._freeze_status_var,
+                  foreground="#4fc3f7").pack(side="left")
+        self._freeze_stop_btn = ttk.Button(bf, text="■  Stop Freeze Detection",
+                                           command=self.stop_freeze_detection,
+                                           state="disabled")
+        self._freeze_stop_btn.pack(side="right")
+        ttk.Button(bf, text="Clear log",
+                   command=self._clear_freeze_log).pack(side="right", padx=(0,6))
+
+        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        # log box
+        self._freeze_box = scrolledtext.ScrolledText(p, width=58, height=20,
+                                                      state="disabled", font=MONO_FONT)
+        self._freeze_box.pack(fill="both", expand=True)
+        self._freeze_box.tag_config("OK",    foreground="green")
+        self._freeze_box.tag_config("WARN",  foreground="darkorange")
+        self._freeze_box.tag_config("ERROR", foreground="red")
+        self._freeze_box.tag_config("HEAD",  foreground="purple")
+
+        # state
+        self._freeze_running = False
+        self._freeze_thread  = None
+
+    def _flog(self, msg, level="INFO"):
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        self._freeze_box.config(state="normal")
+        self._freeze_box.insert("end", f"[{ts}] {msg}\n", level)
+        self._freeze_box.see("end")
+        self._freeze_box.config(state="disabled")
+
+    def _clear_freeze_log(self):
+        self._freeze_box.config(state="normal")
+        self._freeze_box.delete("1.0", "end")
+        self._freeze_box.config(state="disabled")
+
+    def start_freeze_detection(self, end_dt):
+        """Called automatically after successful click if Freeze Detection is enabled."""
+        if self._freeze_running:
+            return
+        # read end_dt from fields if user edited them manually
+        try:
+            d = self._freeze_end_date.get().strip()
+            t = self._freeze_end_time.get().strip()
+            if d and t:
+                end_dt = self._parse_dt(d, t)
+        except Exception:
+            pass  # keep auto-calculated end_dt
+        self._freeze_running = True
+        # populate start/end fields
+        start_now = datetime.datetime.now()
+        self.root.after(0, lambda: self._freeze_start_date.set(start_now.strftime("%Y-%m-%d")))
+        self.root.after(0, lambda: self._freeze_start_time.set(start_now.strftime("%H:%M")))
+        self.root.after(0, lambda: self._freeze_end_date.set(end_dt.strftime("%Y-%m-%d")))
+        self.root.after(0, lambda: self._freeze_end_time.set(end_dt.strftime("%H:%M")))
+        self.root.after(0, lambda: self._freeze_stop_btn.config(state="normal"))
+        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection active…"))
+        self._set_status("Freeze Detection active")
+        self._freeze_thread = threading.Thread(
+            target=self._freeze_loop, args=(end_dt,), daemon=True)
+        self._freeze_thread.start()
+
+    def stop_freeze_detection(self):
+        self._freeze_running = False
+        self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
+        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
+        self.root.after(0, lambda: self._flog("Freeze Detection stopped.", "WARN"))
+        self._set_status("Idle")
+
+    def _freeze_loop(self, end_dt):
+        CHECK_INTERVAL = 30   # seconds between checks
+        REFRESH_WAIT   = 60   # seconds to wait after refresh before re-checking
+
+        self.root.after(0, lambda: self._flog(
+            f"── Freeze Detection started (runs until {end_dt.strftime('%H:%M')}) ──", "HEAD"))
+
+        prev_time = None
+
+        while self._freeze_running:
+            # check end time
+            if datetime.datetime.now() >= end_dt:
+                self.root.after(0, lambda: self._flog(
+                    "── Freeze Detection: end time reached, stopping. ──", "HEAD"))
+                self.root.after(0, self.stop_freeze_detection)
+                break
+
+            # check browser still alive
+            if not self._alive():
+                self.root.after(0, lambda: self._flog(
+                    "Browser closed — stopping Freeze Detection.", "ERROR"))
+                self.root.after(0, self.stop_freeze_detection)
+                break
+
+            # sample currentTime
+            current_time = None
+            try:
+                current_time = self.driver.execute_script(
+                    "const v = document.querySelector('video'); "
+                    "return v ? v.currentTime : null;")
+            except Exception as e:
+                err = str(e)
+                self.root.after(0, lambda m=err: self._flog(f"JS error: {m}", "ERROR"))
+
+            if current_time is None:
+                self.root.after(0, lambda: self._flog(
+                    "  ⚠  No video element found — refreshing…", "WARN"))
+                self._do_freeze_refresh(REFRESH_WAIT)
+                prev_time = None
+                continue
+
+            if prev_time is None:
+                # first sample — just record and wait
+                prev_time = current_time
+                self.root.after(0, lambda t=current_time: self._flog(
+                    f"  ▶  First sample: currentTime={t:.1f}s — waiting {CHECK_INTERVAL}s…"))
+                if not self._freeze_sleep(CHECK_INTERVAL):
+                    break
+                continue
+
+            # compare — delta must be at least 80% of CHECK_INTERVAL
+            delta = current_time - prev_time
+            min_expected = CHECK_INTERVAL * 0.8
+            if delta >= min_expected:
+                self.root.after(0, lambda t=current_time, d=delta: self._flog(
+                    f"  ✓  Video OK — currentTime={t:.1f}s (+{d:.1f}s)", "OK"))
+                prev_time = current_time
+                if not self._freeze_sleep(CHECK_INTERVAL):
+                    break
+            else:
+                self.root.after(0, lambda t=current_time, p=prev_time, d=delta, m=min_expected: self._flog(
+                    f"  ❄  FREEZE detected! currentTime={t:.1f}s (+{d:.1f}s, expected ≥{m:.0f}s) — refreshing…", "ERROR"))
+                self._do_freeze_refresh(REFRESH_WAIT)
+                prev_time = None
+
+        self._freeze_running = False
+        self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
+        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
+
+    def _do_freeze_refresh(self, wait_s):
+        """Refresh page and wait before next check. If recovery=remonitor, restart click monitoring."""
+        try:
+            self.driver.refresh()
+            self.root.after(0, lambda: self._flog("  ↺  Page refreshed — waiting for video to load…", "WARN"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self._flog(f"  Refresh error: {m}", "ERROR"))
+        # remonitor: skip the 60s wait — monitoring loop handles its own load_wait
+        if getattr(self, "_freeze_recovery", "refresh_only") == "remonitor":
+            self.root.after(0, lambda: self._flog(
+                "  ▶  Restarting click monitoring to recover playback…", "WARN"))
+            self._freeze_running = False  # pause freeze loop
+            self.root.after(0, self._freeze_remonitor)
+        else:
+            # refresh_only: wait before re-checking (video needs time to reload)
+            self.root.after(0, lambda s=wait_s: self._flog(f"  ⏱  Waiting {s}s…"))
+            self._freeze_sleep(wait_s)
+            # check for DAZN "Join live" button after refresh
+            self._freeze_try_join_live()
+
+    def _freeze_try_join_live(self):
+        """After freeze refresh, click #joinLive if present (DAZN 'Join live' button)."""
+        if not self._alive():
+            return
+        try:
+            btn = self.driver.find_element("id", "joinLive")
+            if btn and btn.is_displayed():
+                btn.click()
+                self.root.after(0, lambda: self._flog(
+                    "  ▶  'Join live' button found — clicked to rejoin stream.", "OK"))
+        except Exception:
+            pass  # button not present — video resumed on its own, continue normally
+
+    def _freeze_remonitor(self):
+        """Restart click monitoring after a freeze. When click succeeds, freeze detection resumes."""
+        if not self._alive():
+            self._flog("Browser closed — cannot remonitor.", "ERROR")
+            return
+        # set start time to now so freeze end time stays consistent
+        self._monitor_start_dt = datetime.datetime.now()
+        self.running = True
+        self.root.after(0, lambda: self.start_btn.config(state="disabled"))
+        self.root.after(0, lambda: self.stop_btn.config(state="normal"))
+        self.log("── Freeze Recovery: restarting click monitoring ──", "HEAD")
+        s_dt = datetime.datetime.now()
+        self.thread = threading.Thread(target=self._loop, args=(s_dt, None), daemon=True)
+        self.thread.start()
+
+    def _freeze_sleep(self, secs):
+        """Interruptible sleep for freeze loop."""
+        for _ in range(max(1, int(secs * 10))):
+            if not self._freeze_running:
+                return False
+            time.sleep(0.1)
+        return True
+
     # ── INSPECTOR TAB ────────────────────────────────────────────────────────
     def _inspector_tab(self, parent):
         p = ttk.Frame(parent, padding=12)
@@ -548,8 +849,7 @@ class App:
         self.inspect_btn = ttk.Button(bf, text="▶  Start Inspect Mode",
                                       command=self._toggle_inspect)
         self.inspect_btn.pack(side="left", padx=(0, 8))
-        ttk.Button(bf, text="Clear", command=self._clear_inspect).pack(side="left", padx=(0, 4))
-        ttk.Button(bf, text="Save to file", command=self._save_inspect).pack(side="left")
+        ttk.Button(bf, text="Clear", command=self._clear_inspect).pack(side="left")
         self._inspect_status = tk.StringVar(value="Inspect mode OFF — click Start to begin")
         ttk.Label(bf, textvariable=self._inspect_status,
                   foreground="#888888").pack(side="left", padx=12)
@@ -685,6 +985,76 @@ class App:
             json.dump(self._captures, f, indent=2, ensure_ascii=False)
         messagebox.showinfo("Saved", f"Saved {len(self._captures)} capture(s) to:\n{path}")
 
+    # ── CHANNELS TAB ─────────────────────────────────────────────────────────
+    def _channels_tab(self, parent):
+        p = ttk.Frame(parent, padding=8)
+        p.pack(fill="both", expand=True)
+
+        # top bar
+        bf = ttk.Frame(p); bf.pack(fill="x", pady=(0, 6))
+        ttk.Button(bf, text="↺  Refresh", command=self._load_channels).pack(side="left")
+        self._ch_status = tk.StringVar(value="")
+        ttk.Label(bf, textvariable=self._ch_status,
+                  foreground="#888888").pack(side="left", padx=10)
+
+        # treeview
+        cols = ("Country", "Channel", "ID", "PC", "Status")
+        self._ch_tree = ttk.Treeview(p, columns=cols, show="headings",
+                                      selectmode="browse")
+        col_widths = {"Country": 80, "Channel": 210, "ID": 55, "PC": 110, "Status": 70}
+        for c in cols:
+            self._ch_tree.heading(c, text=c)
+            self._ch_tree.column(c, width=col_widths[c], anchor="w")
+
+        # color tags
+        self._ch_tree.tag_configure("Chrome", foreground="#f4b400")
+        self._ch_tree.tag_configure("Edge",   foreground="#4fc3f7")
+        self._ch_tree.tag_configure("Both",   foreground="#81c995")
+        self._ch_tree.tag_configure("?",      foreground="#888888")
+
+        sb = ttk.Scrollbar(p, orient="vertical", command=self._ch_tree.yview)
+        self._ch_tree.configure(yscrollcommand=sb.set)
+        self._ch_tree.pack(side="left", fill="both", expand=True)
+        sb.pack(side="left", fill="y")
+
+        self._channels_loaded = False
+
+    def _on_tab_changed(self, _event=None):
+        tab = self.nb.tab(self.nb.select(), "text").strip()
+        if tab == "Channels" and not self._channels_loaded:
+            threading.Thread(target=self._load_channels, daemon=True).start()
+
+    def _load_channels(self):
+        self.root.after(0, lambda: self._ch_status.set("Loading…"))
+        try:
+            import csv, io
+            import ssl as _ssl
+            _ctx = _ssl.create_default_context()
+            _ctx.check_hostname = False
+            _ctx.verify_mode = _ssl.CERT_NONE
+            with urllib.request.urlopen(CHANNELS_URL, timeout=8, context=_ctx) as r:
+                raw = r.read().decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(raw))
+            rows = list(reader)
+            def _update():
+                self._ch_tree.delete(*self._ch_tree.get_children())
+                for row in rows:
+                    status = row.get("Status", "?").strip()
+                    tag = status if status in ("Chrome", "Edge", "Both") else "?"
+                    self._ch_tree.insert("", "end", values=(
+                        row.get("Country","").strip(),
+                        row.get("Channel","").strip(),
+                        row.get("ID","").strip(),
+                        row.get("PC","").strip(),
+                        status,
+                    ), tags=(tag,))
+                self._ch_status.set(f"{len(rows)} channels — {__import__('datetime').datetime.now().strftime('%H:%M:%S')}")
+                self._channels_loaded = True
+            self.root.after(0, _update)
+        except Exception as e:
+            _err = str(e)
+            self.root.after(0, lambda msg=_err: self._ch_status.set(f"Error: {msg}"))
+
     # ── IP fetch ──────────────────────────────────────────────────────────────
     def _fetch_ip(self):
         self.root.after(0, lambda: self.ip_var.set("IP: …"))
@@ -739,6 +1109,38 @@ class App:
         except Exception as e:
             messagebox.showerror("Update failed", str(e))
 
+    # ── browser size helpers ──────────────────────────────────────────────────
+    BROWSER_SIZES = {
+        "SM": (550, 450),
+        "MD": (650, 550),
+        "LG": (750, 650),
+    }
+
+    def _get_browser_wh(self):
+        """Return (w, h) from the browser_size_var dropdown."""
+        key = self.browser_size_var.get().split(" ")[0]  # "SM" or "MD"
+        return self.BROWSER_SIZES.get(key, (550, 450))
+
+    def _on_browser_size_changed(self, *_):
+        """Live-resize browser if it's open."""
+        if not self._alive():
+            return
+        w, h = self._get_browser_wh()
+        try:
+            self.driver.set_window_size(w, h)
+        except Exception:
+            pass
+
+    # ── date helpers ──────────────────────────────────────────────────────────
+    def _shift_date(self, var: tk.StringVar, days: int):
+        raw = var.get().strip()
+        try:
+            d = datetime.datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            d = datetime.datetime.now()
+        d += datetime.timedelta(days=days)
+        var.set(d.strftime("%Y-%m-%d"))
+
     # ── platform change ───────────────────────────────────────────────────────
     def _set_start_now(self):
         n = datetime.datetime.now()
@@ -780,11 +1182,22 @@ class App:
             self._ctrl_click         = rule.get("ctrl_click", False)
             self._video_detect       = rule.get("video_detect", False)
             self._video_detect_js    = rule.get("video_detect_js", "")
+            self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
+        # browser size default per platform
+        if name == "SPOTV Now JP":
+            self.browser_size_var.set("MD — 650×550")
+        elif name:
+            self.browser_size_var.set("SM — 550×450")
+        # freeze detection default per platform
+        if name in ("DAZN DE", "DAZN ES"):
+            self.freeze_detect_var.set(True)
+        else:
+            self.freeze_detect_var.set(False)
         # show/hide event keyword field
         if name in ("Paramount+", "SPOTV Now JP"):
             self._kw_label.grid()
@@ -842,14 +1255,40 @@ class App:
     def _set_status(self, txt):
         self.root.after(0, lambda t=txt: self.status_var.set(t))
 
+    def _toggle_advanced(self):
+        self._advanced_mode = not self._advanced_mode
+        if self._advanced_mode:
+            # show advanced widgets
+            for w, method in self._adv_widgets:
+                if method == "grid":
+                    w.grid()
+                else:
+                    w.pack(side="left", padx=(0, 4))
+            # show Inspector and Channels tabs
+            self.nb.add(self._tab_inspector, text="  Inspector  ")
+            self.nb.add(self._tab_channels,  text="  Channels  ")
+            self._adv_btn.config(text="Simple")
+        else:
+            # hide advanced widgets
+            for w, method in self._adv_widgets:
+                if method == "grid":
+                    w.grid_remove()
+                else:
+                    w.pack_forget()
+            # hide Inspector and Channels tabs
+            self.nb.hide(self._tab_inspector)
+            self.nb.hide(self._tab_channels)
+            self._adv_btn.config(text="Advanced")
+
     def _toggle_compact(self):
         if not self._compact:
             self._full_geometry = self.root.geometry()
             self.nb.pack_forget()
             self._compact_frame.pack(fill="x", before=self._status_bar)
-            self.root.geometry(f"400x60+{self.root.winfo_x()}+{self.root.winfo_y()}")
+            self.root.geometry(f"500x80+{self.root.winfo_x()}+{self.root.winfo_y()}")
             self.root.resizable(False, False)
             self._compact_btn.configure(text="Expand")
+            self._adv_btn.pack_forget()
             self._compact = True
         else:
             self._compact_frame.pack_forget()
@@ -857,7 +1296,8 @@ class App:
             if self._full_geometry:
                 self.root.geometry(self._full_geometry)
             self.root.resizable(True, True)
-            self._compact_btn.configure(text="Compact Mode")
+            self._compact_btn.configure(text="Compact")
+            self._adv_btn.pack(side="right", padx=(4, 0), pady=1)
             self._compact = False
 
     def log(self, msg, level="INFO"):
@@ -899,74 +1339,6 @@ class App:
                     pass
         return killed
 
-    def _on_sys_profile_toggle(self):
-        """When 'Use system profile' is checked, show kill-browser dialog."""
-        if not self.sys_profile_var.get():
-            return  # unchecked — nothing to do
-
-        choice = tk.StringVar(value="cancel")
-
-        dlg = tk.Toplevel(self.root)
-        dlg.title("Close browsers")
-        dlg.resizable(False, False)
-        dlg.grab_set()
-        dlg.transient(self.root)
-        self.root.update_idletasks()
-        rx = self.root.winfo_x(); ry = self.root.winfo_y()
-        rw = self.root.winfo_width(); rh = self.root.winfo_height()
-        dlg.update_idletasks()
-        dw = dlg.winfo_reqwidth(); dh = dlg.winfo_reqheight()
-        dlg.geometry(f"+{rx + (rw - dw)//2}+{ry + (rh - dh)//2}")
-
-        tk.Label(dlg,
-                 text="Which browser processes should be closed?",
-                 font=("", 10, "bold")).pack(padx=20, pady=(12, 4))
-        tk.Label(dlg,
-                 text="The system profile is locked while the browser is open.\n"
-                      "Selenium cannot attach to it if Chrome or Edge is already running.\n"
-                      "Close all instances before opening the browser here.",
-                 justify="left", foreground="#888888").pack(padx=20, pady=(0, 10))
-
-        bf = tk.Frame(dlg, padx=16, pady=8)
-        bf.pack()
-
-        def pick(val):
-            choice.set(val)
-            dlg.destroy()
-
-        tk.Button(bf, text="Kill Chrome", width=14,
-                  command=lambda: pick("chrome")).grid(row=0, column=0, padx=4, pady=4)
-        tk.Button(bf, text="Kill Edge",   width=14,
-                  command=lambda: pick("edge")).grid(row=0, column=1, padx=4, pady=4)
-        tk.Button(bf, text="Both",        width=14,
-                  command=lambda: pick("both")).grid(row=0, column=2, padx=4, pady=4)
-        tk.Button(bf, text="Cancel",      width=14,
-                  command=lambda: pick("cancel")).grid(row=0, column=3, padx=4, pady=4)
-
-        dlg.wait_window()
-
-        val = choice.get()
-        if val == "cancel":
-            self.sys_profile_var.set(False)
-            return
-
-        chrome_win = ["chrome.exe", "chromedriver.exe"]
-        chrome_mac = ["Google Chrome", "chromedriver"]
-        edge_win   = ["msedge.exe", "msedgedriver.exe"]
-        edge_mac   = ["Microsoft Edge", "msedgedriver"]
-
-        if val == "chrome":
-            killed = self._kill_procs(chrome_win, chrome_mac)
-        elif val == "edge":
-            killed = self._kill_procs(edge_win, edge_mac)
-        else:  # both
-            killed = self._kill_procs(chrome_win + edge_win, chrome_mac + edge_mac)
-
-        if killed:
-            self.log(f"Closed for system profile: {', '.join(killed)}", "WARN")
-        else:
-            self.log("System profile: no running browser processes found.", "WARN")
-
     def open_browser(self):
         if not SEL:
             messagebox.showerror("Missing","Install: pip3 install selenium"); return
@@ -975,18 +1347,10 @@ class App:
 
         browser    = self.browser_var.get()
         url        = self.url_var.get().strip()
-        use_sys    = self.sys_profile_var.get()
-        localappdata = os.environ.get("LOCALAPPDATA", "")
-        if use_sys:
-            if browser == "Chrome":
-                pdir = os.path.join(localappdata, "Google", "Chrome", "User Data")
-            else:
-                pdir = os.path.join(localappdata, "Microsoft", "Edge", "User Data")
-        else:
-            pdir = os.path.join(PROFILE_DIR, f"{browser.lower()}_profile")
-            os.makedirs(pdir, exist_ok=True)
+        pdir = os.path.join(PROFILE_DIR, f"{browser.lower()}_profile")
+        os.makedirs(pdir, exist_ok=True)
         self._set_status(f"Opening {browser}…")
-        self.log(f"Opening {browser}  |  {'system' if use_sys else 'autoclicker'} profile: {pdir}")
+        self.log(f"Opening {browser}  |  autoclicker profile: {pdir}")
 
         def _go():
             try:
@@ -994,26 +1358,11 @@ class App:
                     o = COptions()
                 else:
                     o = EOptions()
-                # detect active profile directory for system profile
-                profile_dir_name = "Default"
-                if use_sys and not IS_MAC:
-                    try:
-                        import json as _json
-                        local_state_path = os.path.join(pdir, "Local State")
-                        with open(local_state_path, encoding="utf-8") as _f:
-                            _ls = _json.load(_f)
-                        profile_dir_name = _ls.get("profile", {}).get("last_used", "Default")
-                    except Exception:
-                        profile_dir_name = "Default"
-                    self.root.after(0, lambda p=profile_dir_name: self.log(f"Using profile directory: {p}"))
                 o.add_argument(f"--user-data-dir={pdir}")
-                o.add_argument(f"--profile-directory={profile_dir_name}")
+                o.add_argument(f"--profile-directory=Default")
                 o.add_argument("--disable-blink-features=AutomationControlled")
-                if browser == "Chrome":
-                    o.add_argument("--disable-gpu")
-                    o.add_argument("--disable-gpu-compositing")
-                    o.add_argument("--disable-accelerated-2d-canvas")
-                    o.add_argument("--disable-accelerated-video-decode")
+                o.add_argument("--no-sandbox")
+                o.add_argument("--disable-dev-shm-usage")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
@@ -1140,16 +1489,41 @@ class App:
                         self.root.after(0, lambda: self.log(
                             "msedgedriver not found locally — Selenium Manager will download correct version…", "WARN"))
                         self.driver = webdriver.Edge(options=o)
+                        # after Selenium Manager downloads the driver, copy it to app folder
+                        # so next launch finds it locally without re-downloading
+                        try:
+                            import shutil as _shutil2, re as _re2
+                            _app_dir2 = os.path.dirname(os.path.abspath(sys.argv[0]))
+                            _dest = os.path.join(_app_dir2, drv_name)
+                            _cache_roots2 = [
+                                os.path.join(os.environ.get("LOCALAPPDATA", ""), "selenium", "msedgedriver"),
+                                os.path.join(os.path.expanduser("~"), ".cache", "selenium", "msedgedriver"),
+                            ]
+                            _found_new = None
+                            for _cr2 in _cache_roots2:
+                                if os.path.isdir(_cr2):
+                                    for _root2, _dirs2, _files2 in os.walk(_cr2):
+                                        if drv_name in _files2:
+                                            _candidate = os.path.join(_root2, drv_name)
+                                            # only copy if version matches current Edge
+                                            _mv = _re2.search(r'[/\\](\d+)\.\d+\.\d+\.\d+[/\\]', _candidate)
+                                            if _mv and _em and int(_mv.group(1)) == _em:
+                                                _found_new = _candidate
+                                                break
+                                if _found_new:
+                                    break
+                            if _found_new:
+                                _shutil2.copy2(_found_new, _dest)
+                                self.root.after(0, lambda p=_dest: self.log(
+                                    f"EdgeDriver cached locally: {p}", "OK"))
+                        except Exception as _ce:
+                            self.root.after(0, lambda e=str(_ce): self.log(
+                                f"EdgeDriver cache copy skipped: {e}", "WARN"))
                 # restore saved browser window position/size
                 prefs = self._load_prefs()
                 bkey = f"{browser.lower()}_browser"
                 bpref = prefs.get(bkey, {})
-                _rule = PLATFORM_RULES.get(self.platform_var.get(), {})
-                if "browser_size" in _rule:
-                    w, h = _rule["browser_size"]
-                else:
-                    w = bpref.get("width", 550)
-                    h = bpref.get("height", 450)
+                w, h = self._get_browser_wh()
                 x = bpref.get("x", None)
                 y = bpref.get("y", None)
                 self.driver.set_window_size(w, h)
@@ -1199,6 +1573,100 @@ class App:
         self.log("Browser closed.", "WARN")
         self._set_status("Browser closed")
 
+    def _reposition_browser(self):
+        if not self._alive():
+            messagebox.showwarning("No browser", "Open browser first."); return
+        prefs = self._load_prefs()
+        bkey  = f"{self.browser_var.get().lower()}_browser"
+        bpref = prefs.get(bkey, {})
+        if not bpref:
+            messagebox.showinfo("Reposition", "No saved position found. Close browser normally first to save position."); return
+        try:
+            w, h = self._get_browser_wh()
+            x = bpref.get("x")
+            y = bpref.get("y")
+            self.driver.set_window_size(w, h)
+            if x is not None and y is not None:
+                self.driver.set_window_position(x, y)
+            self.log(f"Browser repositioned to {x},{y} size {w}x{h}", "OK")
+        except Exception as e:
+            self.log(f"Reposition error: {e}", "ERROR")
+
+    def _kill_browser(self):
+        choice = tk.StringVar(value="cancel")
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Kill browser")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.transient(self.root)
+        self.root.update_idletasks()
+        rx = self.root.winfo_x(); ry = self.root.winfo_y()
+        rw = self.root.winfo_width(); rh = self.root.winfo_height()
+        dlg.update_idletasks()
+        dw = dlg.winfo_reqwidth(); dh = dlg.winfo_reqheight()
+        dlg.geometry(f"+{rx + (rw - dw)//2}+{ry + (rh - dh)//2}")
+
+        tk.Label(dlg, text="Which browser processes should be killed?",
+                 font=("", 10, "bold")).pack(padx=20, pady=(12, 4))
+        tk.Label(dlg,
+                 text="Force-kills all Chrome or Edge processes\n(browser + driver).",
+                 justify="left", foreground="#888888").pack(padx=20, pady=(0, 10))
+
+        bf = tk.Frame(dlg, padx=16, pady=8); bf.pack()
+
+        def pick(val):
+            choice.set(val); dlg.destroy()
+
+        tk.Button(bf, text="Kill Chrome", width=14,
+                  command=lambda: pick("chrome")).grid(row=0, column=0, padx=4, pady=4)
+        tk.Button(bf, text="Kill Edge",   width=14,
+                  command=lambda: pick("edge")  ).grid(row=0, column=1, padx=4, pady=4)
+        tk.Button(bf, text="Both",        width=14,
+                  command=lambda: pick("both")  ).grid(row=0, column=2, padx=4, pady=4)
+        tk.Button(bf, text="Cancel",      width=14,
+                  command=lambda: pick("cancel")).grid(row=0, column=3, padx=4, pady=4)
+
+        dlg.wait_window()
+
+        val = choice.get()
+        if val == "cancel":
+            return
+
+        chrome_win = ["chrome.exe", "chromedriver.exe"]
+        chrome_mac = ["Google Chrome", "chromedriver"]
+        edge_win   = ["msedge.exe", "msedgedriver.exe"]
+        edge_mac   = ["Microsoft Edge", "msedgedriver"]
+
+        if val == "chrome":
+            killed = self._kill_procs(chrome_win, chrome_mac)
+        elif val == "edge":
+            killed = self._kill_procs(edge_win, edge_mac)
+        else:
+            killed = self._kill_procs(chrome_win + edge_win, chrome_mac + edge_mac)
+
+        self.driver = None
+        self._set_status("Browser killed")
+        if killed:
+            self.log(f"Killed: {', '.join(killed)}", "WARN")
+        else:
+            self.log("Kill Browser: no running processes found.", "WARN")
+
+    def _toggle_mute(self):
+        if not self._alive():
+            messagebox.showwarning("No browser", "Open browser first."); return
+        self._muted = not self._muted
+        js = ("document.querySelectorAll('video, audio').forEach(el => el.muted = true);"
+              if self._muted else
+              "document.querySelectorAll('video, audio').forEach(el => el.muted = false);")
+        try:
+            self.driver.execute_script(js)
+            label = "🔊 Unmute" if self._muted else "🔇 Mute"
+            self._mute_btn.config(text=label)
+            self.log(f"Browser {'muted' if self._muted else 'unmuted'}.", "WARN")
+        except Exception as e:
+            self.log(f"Mute error: {e}", "ERROR")
+
     # ── test ─────────────────────────────────────────────────────────────────
     def test_targets(self):
         if not self._alive():
@@ -1233,7 +1701,7 @@ class App:
     # ── click / refresh ───────────────────────────────────────────────────────
     def _do_clicks(self):
         targets = self._effective_targets(); by = self._by()
-        load_s = self.load_var.get(); delay_ms = self.delay_var.get()
+        load_s = self.load_var.get(); delay_s = self.delay_var.get()
         scroll_px = self.scroll_after_var.get()
         if load_s > 0: time.sleep(load_s)
         # scroll BEFORE click when key_press is used (e.g. NBA Docomo)
@@ -1271,7 +1739,7 @@ class App:
                 self.log(f"  ✗  not found: '{t}'", "WARN")
             except Exception as e:
                 self.log(f"  ✗  error '{t}': {e}", "ERROR")
-            if delay_ms > 0: time.sleep(delay_ms / 1000)
+            if delay_s > 0: time.sleep(delay_s)
         return ok, len(targets)
 
     def _do_refresh(self):
@@ -1304,6 +1772,8 @@ class App:
                 messagebox.showerror("Date error",
                     f"Use format YYYY-MM-DD and HH:MM:SS\n{e}"); return
         self.running = True
+        self._monitor_start_dt = s_dt
+        self._freeze_end_dt = None  # reset so freeze gets fresh +4h on new monitoring session
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         end_str = str(e_dt) if e_dt else "indefinitely"
@@ -1312,11 +1782,32 @@ class App:
                                        args=(s_dt, e_dt), daemon=True)
         self.thread.start()
 
-    def stop_monitoring(self):
+    def stop_monitoring(self, trigger_freeze=False):
         self.running = False
         self.root.after(0, lambda: self.start_btn.config(state="normal"))
         self.root.after(0, lambda: self.stop_btn.config(state="disabled"))
         self.log("Monitoring stopped.", "WARN"); self._set_status("Stopped")
+        if trigger_freeze and self.freeze_detect_var.get():
+            # keep original end time if freeze was already running (remonitor case)
+            if hasattr(self, "_freeze_end_dt") and self._freeze_end_dt:
+                freeze_end_dt = self._freeze_end_dt
+            else:
+                start_dt = getattr(self, "_monitor_start_dt", datetime.datetime.now())
+                freeze_end_dt = start_dt + datetime.timedelta(hours=4)
+                self._freeze_end_dt = freeze_end_dt
+            FREEZE_DELAY = 60
+            self.root.after(0, lambda: self._flog(
+                f"Freeze Detection will start in {FREEZE_DELAY}s…", "WARN"))
+            def _delayed_start(end_dt=freeze_end_dt):
+                deadline = time.time() + FREEZE_DELAY
+                while time.time() < deadline:
+                    if not self._alive():
+                        self.root.after(0, lambda: self._flog(
+                            "Browser closed before Freeze Detection could start.", "ERROR"))
+                        return
+                    time.sleep(0.5)
+                self.root.after(0, lambda: self.start_freeze_detection(end_dt))
+            threading.Thread(target=_delayed_start, daemon=True).start()
 
     def _sleep(self, secs):
         for _ in range(max(1, int(secs * 10))):
@@ -1371,7 +1862,7 @@ class App:
                     self.root.after(0, lambda e=err: self.log(f"  JS error: {e}", "ERROR"))
                 if playing:
                     self.root.after(0, lambda: self.log("  ▶  Video playing — stopping.", "OK"))
-                    self.root.after(0, self.stop_monitoring)
+                    self.root.after(0, lambda: self.stop_monitoring(trigger_freeze=True))
                     break
                 self.root.after(0, lambda: self.log("  —  Video not playing yet…"))
                 if refresh_s > 0:
@@ -1427,7 +1918,7 @@ class App:
                                 self.root.after(0, lambda x=t: self.log(f"  ✓  post-click '{x}'", "OK"))
                             except Exception:
                                 self.root.after(0, lambda x=t: self.log(f"  —  post-click not found: '{x}'"))
-                self.root.after(0, self.stop_monitoring); break
+                self.root.after(0, lambda: self.stop_monitoring(trigger_freeze=True)); break
             if refresh_s > 0:
                 self.root.after(0, lambda s=refresh_s:
                     self.log(f"Waiting {s}s before refresh…"))
