@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.55"
+VERSION = "1.0.57"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -54,6 +54,7 @@ PLATFORMS = {
     "Prime Video FR": "https://www.primevideo.com",
     "DAZN DE":      "https://www.dazn.com/en-DE/home",
     "DAZN ES":      "https://www.dazn.com/en-ES/home",
+    "DStv":         "https://dstv.stream/#/livetv/sport",
     "Peacock":      "https://www.peacocktv.com/watch/home",
     "Coupang Play": "https://www.coupangplay.com",
     "SPOTV Now JP": "https://spotvnow.jp/schedule/0",
@@ -210,6 +211,17 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "load_wait":       60,
         "freeze_recovery": "refresh_only",
+    },
+    "DStv": {
+        "selector":          "XPath",
+        "targets":           '//button[contains(@class,"PlayerControls_buttonpause")]',
+        "browser":           "Edge",
+        "refresh_first":     False,
+        "load_wait":         10,
+        "hover_before_click": True,
+        "freeze_default":    True,
+        "freeze_no_end":     True,
+        "freeze_recovery":   "remonitor",
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -444,6 +456,7 @@ class App:
         self._post_switch_wait   = 0
         self._prevent_new_window = False
         self._ctrl_click         = False
+        self._hover_before_click = False
         self._video_detect       = False
         self._video_detect_js    = ""
         self._freeze_recovery    = "refresh_only"
@@ -648,6 +661,9 @@ class App:
                                            command=self.stop_freeze_detection,
                                            state="disabled")
         self._freeze_stop_btn.pack(side="right")
+        self._freeze_start_btn = ttk.Button(bf, text="▶  Start Freeze Detection",
+                                            command=self._manual_start_freeze)
+        self._freeze_start_btn.pack(side="right", padx=(0, 6))
         ttk.Button(bf, text="Clear log",
                    command=self._clear_freeze_log).pack(side="right", padx=(0,6))
 
@@ -688,6 +704,8 @@ class App:
             t = self._freeze_end_time.get().strip()
             if d and t:
                 end_dt = self._parse_dt(d, t)
+            # if fields are empty and end_dt was not provided (None), stay None (indefinite)
+            # if fields are empty and end_dt was provided (e.g. now+4h from monitoring), keep it
         except Exception:
             pass  # keep auto-calculated end_dt
         self._freeze_running = True
@@ -695,9 +713,11 @@ class App:
         start_now = datetime.datetime.now()
         self.root.after(0, lambda: self._freeze_start_date.set(start_now.strftime("%Y-%m-%d")))
         self.root.after(0, lambda: self._freeze_start_time.set(start_now.strftime("%H:%M")))
-        self.root.after(0, lambda: self._freeze_end_date.set(end_dt.strftime("%Y-%m-%d")))
-        self.root.after(0, lambda: self._freeze_end_time.set(end_dt.strftime("%H:%M")))
+        if end_dt is not None:
+            self.root.after(0, lambda: self._freeze_end_date.set(end_dt.strftime("%Y-%m-%d")))
+            self.root.after(0, lambda: self._freeze_end_time.set(end_dt.strftime("%H:%M")))
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="normal"))
+        self.root.after(0, lambda: self._freeze_start_btn.config(state="disabled"))
         self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection active…"))
         self._set_status("Freeze Detection active")
         self._freeze_thread = threading.Thread(
@@ -707,22 +727,46 @@ class App:
     def stop_freeze_detection(self):
         self._freeze_running = False
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
+        self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
         self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
         self.root.after(0, lambda: self._flog("Freeze Detection stopped.", "WARN"))
         self._set_status("Idle")
+
+    def _manual_start_freeze(self):
+        """Start Freeze Detection manually, without going through monitoring."""
+        if self._freeze_running:
+            return
+        if not self._alive():
+            messagebox.showwarning("No browser", "Open browser first.")
+            return
+        # calculate end_dt: use end fields if filled, None if empty (indefinite)
+        try:
+            d = self._freeze_end_date.get().strip()
+            t = self._freeze_end_time.get().strip()
+            if d and t:
+                end_dt = self._parse_dt(d, t)
+            else:
+                end_dt = None  # no end time — run indefinitely
+        except Exception:
+            end_dt = None
+        self._freeze_end_dt = end_dt
+        self._freeze_start_btn.config(state="disabled")
+        self._flog("Freeze Detection started manually.", "OK")
+        self.start_freeze_detection(end_dt)
 
     def _freeze_loop(self, end_dt):
         CHECK_INTERVAL = 30   # seconds between checks
         REFRESH_WAIT   = 60   # seconds to wait after refresh before re-checking
 
+        end_label = end_dt.strftime("%H:%M") if end_dt else "∞ (no end time)"
         self.root.after(0, lambda: self._flog(
-            f"── Freeze Detection started (runs until {end_dt.strftime('%H:%M')}) ──", "HEAD"))
+            f"── Freeze Detection started (runs until {end_label}) ──", "HEAD"))
 
         prev_time = None
 
         while self._freeze_running:
-            # check end time
-            if datetime.datetime.now() >= end_dt:
+            # check end time (skip if indefinite)
+            if end_dt is not None and datetime.datetime.now() >= end_dt:
                 self.root.after(0, lambda: self._flog(
                     "── Freeze Detection: end time reached, stopping. ──", "HEAD"))
                 self.root.after(0, self.stop_freeze_detection)
@@ -778,6 +822,7 @@ class App:
 
         self._freeze_running = False
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
+        self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
         self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
 
     def _do_freeze_refresh(self, wait_s):
@@ -1180,11 +1225,12 @@ class App:
             self._post_switch_wait   = rule.get("post_switch_wait", 0)
             self._prevent_new_window = rule.get("prevent_new_window", False)
             self._ctrl_click         = rule.get("ctrl_click", False)
+            self._hover_before_click = rule.get("hover_before_click", False)
             self._video_detect       = rule.get("video_detect", False)
             self._video_detect_js    = rule.get("video_detect_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -1194,13 +1240,18 @@ class App:
         elif name:
             self.browser_size_var.set("SM — 550×450")
         # freeze detection default per platform
-        if name in ("DAZN DE", "DAZN ES",
+        if name in ("DAZN DE", "DAZN ES", "DStv",
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
+        # DStv: clear end date/time (runs indefinitely)
+        rule = PLATFORM_RULES.get(name, {})
+        if rule.get("freeze_no_end"):
+            self._freeze_end_date.set("")
+            self._freeze_end_time.set("")
         # show/hide event keyword field
         if name in ("Paramount+", "SPOTV Now JP"):
             self._kw_label.grid()
@@ -1366,6 +1417,8 @@ class App:
                 o.add_argument("--disable-blink-features=AutomationControlled")
                 o.add_argument("--no-sandbox")
                 o.add_argument("--disable-dev-shm-usage")
+                if browser == "Chrome":
+                    o.add_argument("--disable-gpu")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
@@ -1712,6 +1765,21 @@ class App:
             self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
             self.log(f"  ↓  scrolled {scroll_px}px before click", "OK")
             time.sleep(0.5)
+        # hover over video element first if platform requires it (to reveal player controls)
+        if self._hover_before_click:
+            try:
+                self.driver.execute_script("""
+                    const el = document.querySelector('video') || document.body;
+                    const rect = el.getBoundingClientRect();
+                    const cx = rect.left + rect.width / 2;
+                    const cy = rect.top + rect.height / 2;
+                    el.dispatchEvent(new MouseEvent('mousemove', {bubbles:true, clientX:cx, clientY:cy}));
+                    el.dispatchEvent(new MouseEvent('mouseenter', {bubbles:true, clientX:cx, clientY:cy}));
+                    document.dispatchEvent(new MouseEvent('mousemove', {bubbles:true, clientX:cx, clientY:cy}));
+                """)
+                time.sleep(1.5)
+            except Exception:
+                pass  # continue anyway
         ok = 0
         for t in targets:
             try:
