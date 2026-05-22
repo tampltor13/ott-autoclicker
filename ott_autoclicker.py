@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.57"
+VERSION = "1.0.58"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -805,9 +805,9 @@ class App:
                     break
                 continue
 
-            # compare — delta must be at least 80% of CHECK_INTERVAL
+            # compare — delta must be at least MIN_DELTA seconds
             delta = current_time - prev_time
-            min_expected = CHECK_INTERVAL * 0.8
+            min_expected = 15  # seconds; video must advance at least this much per interval
             if delta >= min_expected:
                 self.root.after(0, lambda t=current_time, d=delta: self._flog(
                     f"  ✓  Video OK — currentTime={t:.1f}s (+{d:.1f}s)", "OK"))
