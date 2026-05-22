@@ -225,12 +225,9 @@ PLATFORM_RULES = {
         "freeze_recovery":   "remonitor",
     },
     "FanCode": {
-        "selector":       "XPath",
-        "targets":        "",
-        "browser":        "Edge",
-        "browser_size":   (750, 650),
-        "refresh_first":  False,
-        "freeze_default": False,
+        "selector":      "XPath",
+        "targets":       "",
+        "refresh_first": False,
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -1239,13 +1236,15 @@ class App:
             self._video_detect_js    = rule.get("video_detect_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
         if name == "SPOTV Now JP":
             self.browser_size_var.set("MD — 650×550")
+        elif name == "FanCode":
+            self.browser_size_var.set("LG — 750×650")
         elif name:
             self.browser_size_var.set("SM — 550×450")
         # freeze detection default per platform
