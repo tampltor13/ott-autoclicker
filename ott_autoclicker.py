@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.58"
+VERSION = "1.0.59"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -65,6 +65,7 @@ PLATFORMS = {
     "Disney+ SE": "https://www.disneyplus.com/home",
     "Disney+ DK": "https://www.disneyplus.com/home",
     "Disney+ AR": "https://www.disneyplus.com/home",
+    "FanCode":    "https://www.fancode.com",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -222,6 +223,14 @@ PLATFORM_RULES = {
         "freeze_default":    True,
         "freeze_no_end":     True,
         "freeze_recovery":   "remonitor",
+    },
+    "FanCode": {
+        "selector":       "XPath",
+        "targets":        "",
+        "browser":        "Edge",
+        "browser_size":   (750, 650),
+        "refresh_first":  False,
+        "freeze_default": False,
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
