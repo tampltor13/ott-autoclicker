@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.59"
+VERSION = "1.0.60"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -46,7 +46,7 @@ PLATFORMS = {
     "Prime Video USA": "https://www.amazon.com/gp/video/sports",
     "Prime Video IT":  "https://www.primevideo.com",
     "Prime Video BR":  "https://www.primevideo.com",
-    "Prime Video UK":  "https://www.amazon.co.uk/gp/video",
+    "Prime Video UK":  "https://www.amazon.co.uk/gp/video/sports",
     "Prime Video DE":  "https://www.amazon.de/gp/video/sports",
     "Prime Video ES":  "https://www.primevideo.com",
     "Prime Video JP":  "https://www.amazon.co.jp/",
@@ -761,14 +761,17 @@ class App:
         self.start_freeze_detection(end_dt)
 
     def _freeze_loop(self, end_dt):
-        CHECK_INTERVAL = 30   # seconds between checks
-        REFRESH_WAIT   = 60   # seconds to wait after refresh before re-checking
+        CHECK_INTERVAL   = 30   # seconds between checks
+        REFRESH_WAIT     = 60   # seconds to wait after refresh before re-checking
+        MAX_ZERO_RETRIES = 3    # stop after this many consecutive zero-baseline cycles
 
         end_label = end_dt.strftime("%H:%M") if end_dt else "∞ (no end time)"
         self.root.after(0, lambda: self._flog(
             f"── Freeze Detection started (runs until {end_label}) ──", "HEAD"))
 
-        prev_time = None
+        prev_time        = None
+        zero_retry_count = 0    # counts consecutive cycles where baseline was 0.0
+        consec_zero_recovery = 0  # counts consecutive freeze recoveries where currentTime stayed 0.0
 
         while self._freeze_running:
             # check end time (skip if indefinite)
@@ -803,7 +806,23 @@ class App:
                 continue
 
             if prev_time is None:
-                # first sample — just record and wait
+                # first sample — if it's 0.0, video probably hasn't started yet; skip and retry
+                if current_time == 0.0:
+                    zero_retry_count += 1
+                    if zero_retry_count >= MAX_ZERO_RETRIES:
+                        self.root.after(0, lambda: self._flog(
+                            f"  ⛔  Baseline currentTime=0.0 for {MAX_ZERO_RETRIES} consecutive cycles — "
+                            "video not playing. Stopping Freeze Detection.", "ERROR"))
+                        self.root.after(0, self.stop_freeze_detection)
+                        break
+                    self.root.after(0, lambda n=zero_retry_count, m=MAX_ZERO_RETRIES: self._flog(
+                        f"  ⏳  Baseline=0.0 — video not started yet, retrying ({n}/{m})… waiting {CHECK_INTERVAL}s", "WARN"))
+                    if not self._freeze_sleep(CHECK_INTERVAL):
+                        break
+                    continue
+                # baseline is > 0 — video is playing, reset counter and proceed normally
+                zero_retry_count = 0
+                consec_zero_recovery = 0
                 prev_time = current_time
                 self.root.after(0, lambda t=current_time: self._flog(
                     f"  ▶  First sample: currentTime={t:.1f}s — waiting {CHECK_INTERVAL}s…"))
@@ -818,9 +837,21 @@ class App:
                 self.root.after(0, lambda t=current_time, d=delta: self._flog(
                     f"  ✓  Video OK — currentTime={t:.1f}s (+{d:.1f}s)", "OK"))
                 prev_time = current_time
+                consec_zero_recovery = 0
                 if not self._freeze_sleep(CHECK_INTERVAL):
                     break
             else:
+                # freeze detected — check if currentTime is stuck at 0.0 after recovery attempts
+                if current_time == 0.0:
+                    consec_zero_recovery += 1
+                    if consec_zero_recovery >= MAX_ZERO_RETRIES:
+                        self.root.after(0, lambda: self._flog(
+                            f"  ⛔  currentTime=0.0 after {MAX_ZERO_RETRIES} consecutive recoveries — "
+                            "video unresponsive. Stopping Freeze Detection.", "ERROR"))
+                        self.root.after(0, self.stop_freeze_detection)
+                        break
+                else:
+                    consec_zero_recovery = 0  # normal freeze (not zero), reset zero-recovery counter
                 self.root.after(0, lambda t=current_time, p=prev_time, d=delta, m=min_expected: self._flog(
                     f"  ❄  FREEZE detected! currentTime={t:.1f}s (+{d:.1f}s, expected ≥{m:.0f}s) — refreshing…", "ERROR"))
                 self._do_freeze_refresh(REFRESH_WAIT)
