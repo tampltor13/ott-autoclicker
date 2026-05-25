@@ -32,6 +32,22 @@ if "!PYTHON!"=="" (
 if "!PYTHON!"=="" (
     echo Python not found. Downloading installer...
     curl -L -o python_installer.exe https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
+    if not exist python_installer.exe goto :ps_download
+    for %%F in (python_installer.exe) do if %%~zF LSS 1000000 goto :ps_download
+    goto :run_installer
+
+    :ps_download
+    echo curl failed or file too small, trying PowerShell...
+    del python_installer.exe >nul 2>&1
+    powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe' -OutFile 'python_installer.exe'"
+    if not exist python_installer.exe (
+        echo.
+        echo ERROR: Could not download Python installer. Check your internet connection.
+        pause
+        exit /b 1
+    )
+
+    :run_installer
     echo.
     echo Python installer launched.
     echo Click Install Now and make sure "Add python.exe to PATH" is checked.
