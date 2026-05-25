@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.60"
+VERSION = "1.0.61"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -62,9 +62,10 @@ PLATFORMS = {
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
     "Disney+":     "https://www.disneyplus.com/home",
-    "Disney+ SE": "https://www.disneyplus.com/home",
-    "Disney+ DK": "https://www.disneyplus.com/home",
-    "Disney+ AR": "https://www.disneyplus.com/home",
+    "Disney+ SE":  "https://www.disneyplus.com/home",
+    "Disney+ DK":  "https://www.disneyplus.com/home",
+    "Disney+ AR":  "https://www.disneyplus.com/en-gb/home",
+    "Disney+ BR":  "https://www.disneyplus.com/en-gb/home",
     "FanCode":    "https://www.fancode.com",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
@@ -175,23 +176,31 @@ PLATFORM_RULES = {
     },
     "Disney+": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
         "refresh_first": True,
     },
     "Disney+ SE": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
         "refresh_first": True,
     },
     "Disney+ DK": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
         "refresh_first": True,
+    },
+    "Disney+ BR": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
+        "refresh_first": True,
+        "click_delay":   2,
+        "load_wait":     10,
     },
     "Disney+ AR": {
         "selector":      "XPath",
-        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]',
+        "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
         "refresh_first": True,
+        "click_delay":   2,
         "load_wait":     10,
     },
     "TOD": {
@@ -757,8 +766,19 @@ class App:
             end_dt = None
         self._freeze_end_dt = end_dt
         self._freeze_start_btn.config(state="disabled")
-        self._flog("Freeze Detection started manually.", "OK")
-        self.start_freeze_detection(end_dt)
+        MANUAL_DELAY = 30
+        self._flog(f"Freeze Detection will start in {MANUAL_DELAY}s…", "WARN")
+        def _delayed_manual(end_dt=end_dt):
+            deadline = time.time() + MANUAL_DELAY
+            while time.time() < deadline:
+                if not self._alive():
+                    self.root.after(0, lambda: self._flog(
+                        "Browser closed before Freeze Detection could start.", "ERROR"))
+                    self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
+                    return
+                time.sleep(0.5)
+            self.root.after(0, lambda: self.start_freeze_detection(end_dt))
+        threading.Thread(target=_delayed_manual, daemon=True).start()
 
     def _freeze_loop(self, end_dt):
         CHECK_INTERVAL   = 30   # seconds between checks
@@ -1267,12 +1287,12 @@ class App:
             self._video_detect_js    = rule.get("video_detect_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name == "SPOTV Now JP":
+        if name in ("SPOTV Now JP", "Disney+ AR"):
             self.browser_size_var.set("MD — 650×550")
         elif name == "FanCode":
             self.browser_size_var.set("LG — 750×650")
@@ -1282,7 +1302,8 @@ class App:
         if name in ("DAZN DE", "DAZN ES", "DStv",
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
-                    "Prime Video JP", "Prime Video MX", "Prime Video FR"):
+                    "Prime Video JP", "Prime Video MX", "Prime Video FR",
+                    "Disney+ AR"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -1456,8 +1477,7 @@ class App:
                 o.add_argument("--disable-blink-features=AutomationControlled")
                 o.add_argument("--no-sandbox")
                 o.add_argument("--disable-dev-shm-usage")
-                if browser == "Chrome":
-                    o.add_argument("--disable-gpu")
+                o.add_argument("--disable-gpu")
                 o.add_experimental_option("excludeSwitches", ["enable-automation"])
                 o.add_experimental_option("useAutomationExtension", False)
                 if browser == "Chrome":
