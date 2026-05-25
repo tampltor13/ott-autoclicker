@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.61"
+VERSION = "1.0.62"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -812,7 +812,9 @@ class App:
             current_time = None
             try:
                 current_time = self.driver.execute_script(
-                    "const v = document.querySelector('video'); "
+                    "const vids = document.querySelectorAll('video');"
+                    "const v = Array.from(vids).find(v => !v.paused && v.readyState > 0)"
+                    "         || vids[vids.length - 1];"
                     "return v ? v.currentTime : null;")
             except Exception as e:
                 err = str(e)
@@ -1292,7 +1294,7 @@ class App:
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name in ("SPOTV Now JP", "Disney+ AR"):
+        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR"):
             self.browser_size_var.set("MD — 650×550")
         elif name == "FanCode":
             self.browser_size_var.set("LG — 750×650")
