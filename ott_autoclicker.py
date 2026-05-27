@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.62"
+VERSION = "1.0.66"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -67,6 +67,7 @@ PLATFORMS = {
     "Disney+ AR":  "https://www.disneyplus.com/en-gb/home",
     "Disney+ BR":  "https://www.disneyplus.com/en-gb/home",
     "FanCode":    "https://www.fancode.com",
+    "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -149,6 +150,9 @@ PLATFORM_RULES = {
     "SPOTV Now JP": {
         "selector":           "XPath",
         "targets":            '//div[contains(@class,"match-column")]//div[contains(@class,"view-box live")]',
+        "pre_click_targets":  '//button[contains(@class,"login-btn")]\n//button[contains(@class,"default") and contains(.,"ログイン")]',
+        "pre_click_wait":     5,   # wait between pre-clicks (login form load)
+        "pre_click_nav_url":  "https://spotvnow.jp/schedule/0",  # navigate here after pre-clicks
         "post_click_targets": '//button[contains(@class,"vue-confirm-btn live-btn")]',
         "post_click_wait":    3,   # wait before switching to new tab
         "post_switch_wait":   3,   # wait after switching, before clicking popup
@@ -233,10 +237,18 @@ PLATFORM_RULES = {
         "freeze_no_end":     True,
         "freeze_recovery":   "remonitor",
     },
-    "FanCode": {
+    "Tencent": {
         "selector":      "XPath",
         "targets":       "",
         "refresh_first": False,
+    },
+    "FanCode": {
+        "selector":        "XPath",
+        "targets":         "",
+        "refresh_first":   True,
+        "video_detect":    True,
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "freeze_recovery": "refresh_only",
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -466,6 +478,9 @@ class App:
         self.event_kw_var.trace_add("write", self._on_kw_changed)
         self._base_targets = ""
         self._key_press          = ""
+        self._pre_click_targets  = []
+        self._pre_click_wait     = 3
+        self._pre_click_nav_url  = ""
         self._post_click_targets = []
         self._post_click_wait    = 3
         self._post_switch_wait   = 0
@@ -1279,6 +1294,9 @@ class App:
             else:
                 self.load_var.set(5)
             self._key_press          = rule.get("key_press", "")
+            self._pre_click_targets  = rule.get("pre_click_targets", "").splitlines()
+            self._pre_click_wait     = rule.get("pre_click_wait", 3)
+            self._pre_click_nav_url  = rule.get("pre_click_nav_url", "")
             self._post_click_targets = rule.get("post_click_targets", "").splitlines()
             self._post_click_wait    = rule.get("post_click_wait", 3)
             self._post_switch_wait   = rule.get("post_switch_wait", 0)
@@ -1305,7 +1323,7 @@ class App:
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
-                    "Disney+ AR"):
+                    "Disney+ AR", "FanCode"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -2007,6 +2025,37 @@ class App:
             # ──────────────────────────────────────────────────────────────────
 
             self.root.after(0, lambda: self.log("── click cycle ──", "HEAD"))
+            # pre-click targets: plain clicks only (no ctrl, no tab switch) — e.g. login flow
+            if self._pre_click_targets:
+                by = self._by()
+                any_pre_clicked = False
+                for i, t in enumerate(self._pre_click_targets):
+                    try:
+                        el = WebDriverWait(self.driver, 2).until(
+                            EC.element_to_be_clickable((by, t)))
+                        try:
+                            el.click()
+                        except ElementClickInterceptedException:
+                            self.driver.execute_script("arguments[0].click()", el)
+                        self.root.after(0, lambda x=t: self.log(f"  ✓  pre-click '{x}'", "OK"))
+                        any_pre_clicked = True
+                        # always wait after each pre-click (including last) to let page react
+                        self._sleep(self._pre_click_wait)
+                    except TimeoutException:
+                        self.root.after(0, lambda x=t: self.log(f"  —  pre-click not found (skip): '{x}'"))
+                    except Exception as e:
+                        err = str(e)
+                        self.root.after(0, lambda x=t, e=err: self.log(f"  ✗  pre-click error '{x}': {e}", "ERROR"))
+                # navigate to schedule URL only if login flow was triggered
+                if self._pre_click_nav_url and any_pre_clicked:
+                    try:
+                        self.driver.get(self._pre_click_nav_url)
+                        self.root.after(0, lambda u=self._pre_click_nav_url:
+                            self.log(f"  ↪  navigated to {u}", "OK"))
+                        self._sleep(self.load_var.get() or 5)
+                    except Exception as e:
+                        err = str(e)
+                        self.root.after(0, lambda e=err: self.log(f"  ✗  navigate error: {e}", "ERROR"))
             handles_before = set(self.driver.window_handles) if self._prevent_new_window else set()
             try:
                 ok, tot = self._do_clicks()
