@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.66"
+VERSION = "1.0.70"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -68,6 +68,7 @@ PLATFORMS = {
     "Disney+ BR":  "https://www.disneyplus.com/en-gb/home",
     "FanCode":    "https://www.fancode.com",
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
+    "Stan":       "https://play.stan.com.au/sport",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -227,27 +228,42 @@ PLATFORM_RULES = {
         "freeze_recovery": "refresh_only",
     },
     "DStv": {
-        "selector":          "XPath",
-        "targets":           '//button[contains(@class,"PlayerControls_buttonpause")]',
-        "browser":           "Edge",
-        "refresh_first":     False,
-        "load_wait":         10,
-        "hover_before_click": True,
-        "freeze_default":    True,
-        "freeze_no_end":     True,
-        "freeze_recovery":   "remonitor",
+        # OLD click mode (keep for reference, re-enable if DStv breaks again):
+        # "selector":           "XPath",
+        # "targets":            '//button[contains(@class,"PlayerControls_buttonpause")]',
+        # "refresh_first":      False,
+        # "load_wait":          10,
+        # "hover_before_click": True,
+        # "freeze_recovery":    "remonitor",
+        "video_detect":    True,
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":   True,
+        "load_wait":       60,
+        "freeze_default":  True,
+        "freeze_no_end":   True,
+        "freeze_recovery": "refresh_only",
     },
     "Tencent": {
         "selector":      "XPath",
         "targets":       "",
         "refresh_first": False,
     },
+    "Stan": {
+        "selector":       "XPath",
+        "targets":        '//span[contains(@class,"play__label") and text()="Watch Live"]',
+        "refresh_first":  True,
+        "load_wait":      10,
+        "click_delay":    2,
+        "force_js_click": True,
+    },
     "FanCode": {
         "selector":        "XPath",
         "targets":         "",
         "refresh_first":   True,
+        "load_wait":       30,
         "video_detect":    True,
-        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "video_detect_key": "m",
         "freeze_recovery": "refresh_only",
     },
 }
@@ -485,10 +501,12 @@ class App:
         self._post_click_wait    = 3
         self._post_switch_wait   = 0
         self._prevent_new_window = False
+        self._force_js_click     = False
         self._ctrl_click         = False
         self._hover_before_click = False
         self._video_detect       = False
         self._video_detect_js    = ""
+        self._video_detect_key   = ""
         self._freeze_recovery    = "refresh_only"
         r += 1
 
@@ -1301,10 +1319,12 @@ class App:
             self._post_click_wait    = rule.get("post_click_wait", 3)
             self._post_switch_wait   = rule.get("post_switch_wait", 0)
             self._prevent_new_window = rule.get("prevent_new_window", False)
+            self._force_js_click     = rule.get("force_js_click", False)
             self._ctrl_click         = rule.get("ctrl_click", False)
             self._hover_before_click = rule.get("hover_before_click", False)
             self._video_detect       = rule.get("video_detect", False)
             self._video_detect_js    = rule.get("video_detect_js", "")
+            self._video_detect_key   = rule.get("video_detect_key", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
@@ -1314,7 +1334,7 @@ class App:
         # browser size default per platform
         if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR"):
             self.browser_size_var.set("MD — 650×550")
-        elif name == "FanCode":
+        elif name in ("FanCode", "Stan"):
             self.browser_size_var.set("LG — 750×650")
         elif name:
             self.browser_size_var.set("SM — 550×450")
@@ -1862,6 +1882,14 @@ class App:
         ok = 0
         for t in targets:
             try:
+                if self._force_js_click:
+                    el = WebDriverWait(self.driver, 8).until(
+                        EC.presence_of_element_located((by, t)))
+                    self.driver.execute_script("arguments[0].click()", el)
+                    self.log(f"  ✓  JS-clicked '{t}'", "OK")
+                    ok += 1
+                    if delay_s > 0: time.sleep(delay_s)
+                    continue
                 el = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((by, t)))
                 if self._ctrl_click:
@@ -2012,6 +2040,14 @@ class App:
                     self.root.after(0, lambda e=err: self.log(f"  JS error: {e}", "ERROR"))
                 if playing:
                     self.root.after(0, lambda: self.log("  ▶  Video playing — stopping.", "OK"))
+                    if self._video_detect_key:
+                        try:
+                            ActionChains(self.driver).send_keys(self._video_detect_key).perform()
+                            k = self._video_detect_key
+                            self.root.after(0, lambda k=k: self.log(f"  ⌨  sent key '{k}'", "OK"))
+                        except Exception as e:
+                            err = str(e)
+                            self.root.after(0, lambda e=err: self.log(f"  ✗  key error: {e}", "ERROR"))
                     self.root.after(0, lambda: self.stop_monitoring(trigger_freeze=True))
                     break
                 self.root.after(0, lambda: self.log("  —  Video not playing yet…"))
