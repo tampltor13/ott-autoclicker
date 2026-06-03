@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.72"
+VERSION = "1.0.74"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -257,12 +257,14 @@ PLATFORM_RULES = {
         "post_refresh_key": " ",
     },
     "Stan": {
-        "selector":       "XPath",
-        "targets":        '//span[contains(@class,"play__label") and text()="Watch Live"]',
-        "refresh_first":  True,
-        "load_wait":      10,
-        "click_delay":    2,
-        "force_js_click": True,
+        "selector":        "XPath",
+        "targets":         '//span[contains(@class,"play__label") and text()="Watch Live"]',
+        "refresh_first":   True,
+        "load_wait":       10,
+        "click_delay":     2,
+        "force_js_click":  True,
+        "dispatch_click":  True,
+        "freeze_video_js": "const p = document.querySelector('stan-player'); const v = p && p.shadowRoot && p.shadowRoot.querySelector('video'); return v ? v.currentTime : null;",
     },
     "FanCode": {
         "selector":        "XPath",
@@ -283,7 +285,7 @@ BY_MAP = {
     "XPath":        By.XPATH        if SEL else None,
 }
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_profiles")
-LOG_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "autoclicker.txt")
+LOG_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs.txt")
 MONO_FONT   = ("Menlo", 11) if IS_MAC else ("Consolas", 11)
 
 
@@ -512,11 +514,13 @@ class App:
         self._post_switch_wait   = 0
         self._prevent_new_window = False
         self._force_js_click     = False
+        self._dispatch_click     = False
         self._ctrl_click         = False
         self._hover_before_click = False
         self._video_detect       = False
         self._video_detect_js    = ""
         self._video_detect_key   = ""
+        self._freeze_video_js    = ""
         self._freeze_recovery    = "refresh_only"
         r += 1
 
@@ -861,11 +865,14 @@ class App:
             # sample currentTime
             current_time = None
             try:
-                current_time = self.driver.execute_script(
-                    "const vids = document.querySelectorAll('video');"
-                    "const v = Array.from(vids).find(v => !v.paused && v.readyState > 0)"
-                    "         || vids[vids.length - 1];"
-                    "return v ? v.currentTime : null;")
+                if self._freeze_video_js:
+                    current_time = self.driver.execute_script(self._freeze_video_js)
+                else:
+                    current_time = self.driver.execute_script(
+                        "const vids = document.querySelectorAll('video');"
+                        "const v = Array.from(vids).find(v => !v.paused && v.readyState > 0)"
+                        "         || vids[vids.length - 1];"
+                        "return v ? v.currentTime : null;")
             except Exception as e:
                 err = str(e)
                 self.root.after(0, lambda m=err: self._flog(f"JS error: {m}", "ERROR"))
@@ -1338,11 +1345,13 @@ class App:
             self._post_switch_wait   = rule.get("post_switch_wait", 0)
             self._prevent_new_window = rule.get("prevent_new_window", False)
             self._force_js_click     = rule.get("force_js_click", False)
+            self._dispatch_click     = rule.get("dispatch_click", False)
             self._ctrl_click         = rule.get("ctrl_click", False)
             self._hover_before_click = rule.get("hover_before_click", False)
             self._video_detect       = rule.get("video_detect", False)
             self._video_detect_js    = rule.get("video_detect_js", "")
             self._video_detect_key   = rule.get("video_detect_key", "")
+            self._freeze_video_js    = rule.get("freeze_video_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
         # set default browser per platform
         if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
@@ -1361,7 +1370,7 @@ class App:
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
-                    "Disney+ AR", "FanCode"):
+                    "Disney+ AR", "FanCode", "Stan"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -1910,8 +1919,14 @@ class App:
                 if self._force_js_click:
                     el = WebDriverWait(self.driver, 8).until(
                         EC.presence_of_element_located((by, t)))
-                    self.driver.execute_script("arguments[0].click()", el)
-                    self.log(f"  ✓  JS-clicked '{t}'", "OK")
+                    if self._dispatch_click:
+                        self.driver.execute_script(
+                            "arguments[0].dispatchEvent(new MouseEvent('click', "
+                            "{bubbles: true, cancelable: true, view: window}))", el)
+                        self.log(f"  ✓  dispatch-clicked '{t}'", "OK")
+                    else:
+                        self.driver.execute_script("arguments[0].click()", el)
+                        self.log(f"  ✓  JS-clicked '{t}'", "OK")
                     ok += 1
                     if delay_s > 0: time.sleep(delay_s)
                     continue
