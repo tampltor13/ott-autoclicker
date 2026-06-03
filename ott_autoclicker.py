@@ -35,7 +35,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.70"
+VERSION = "1.0.72"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -69,6 +69,7 @@ PLATFORMS = {
     "FanCode":    "https://www.fancode.com",
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
     "Stan":       "https://play.stan.com.au/sport",
+    "Fubo":       "https://www.fubo.tv/",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -248,6 +249,13 @@ PLATFORM_RULES = {
         "targets":       "",
         "refresh_first": False,
     },
+    "Fubo": {
+        "selector":         "XPath",
+        "targets":          "",
+        "refresh_first":    True,
+        "load_wait":        10,
+        "post_refresh_key": " ",
+    },
     "Stan": {
         "selector":       "XPath",
         "targets":        '//span[contains(@class,"play__label") and text()="Watch Live"]',
@@ -275,6 +283,7 @@ BY_MAP = {
     "XPath":        By.XPATH        if SEL else None,
 }
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_profiles")
+LOG_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "autoclicker.txt")
 MONO_FONT   = ("Menlo", 11) if IS_MAC else ("Consolas", 11)
 
 
@@ -494,6 +503,7 @@ class App:
         self.event_kw_var.trace_add("write", self._on_kw_changed)
         self._base_targets = ""
         self._key_press          = ""
+        self._post_refresh_key   = ""
         self._pre_click_targets  = []
         self._pre_click_wait     = 3
         self._pre_click_nav_url  = ""
@@ -731,11 +741,18 @@ class App:
         self._freeze_thread  = None
 
     def _flog(self, msg, level="INFO"):
-        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        now = datetime.datetime.now()
+        ts  = now.strftime("%d-%m %H:%M:%S")
         self._freeze_box.config(state="normal")
         self._freeze_box.insert("end", f"[{ts}] {msg}\n", level)
         self._freeze_box.see("end")
         self._freeze_box.config(state="disabled")
+        # append to log file
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[FREEZE] [{ts}] {msg}\n")
+        except Exception:
+            pass
 
     def _clear_freeze_log(self):
         self._freeze_box.config(state="normal")
@@ -1312,6 +1329,7 @@ class App:
             else:
                 self.load_var.set(5)
             self._key_press          = rule.get("key_press", "")
+            self._post_refresh_key   = rule.get("post_refresh_key", "")
             self._pre_click_targets  = rule.get("pre_click_targets", "").splitlines()
             self._pre_click_wait     = rule.get("pre_click_wait", 3)
             self._pre_click_nav_url  = rule.get("pre_click_nav_url", "")
@@ -1332,7 +1350,7 @@ class App:
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR"):
+        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo"):
             self.browser_size_var.set("MD — 650×550")
         elif name in ("FanCode", "Stan"):
             self.browser_size_var.set("LG — 750×650")
@@ -1455,7 +1473,8 @@ class App:
             self._compact = False
 
     def log(self, msg, level="INFO"):
-        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        now = datetime.datetime.now()
+        ts  = now.strftime("%d-%m %H:%M:%S")
         self.log_box.config(state="normal")
         self.log_box.insert("end", f"[{ts}] {msg}\n", level)
         self.log_box.see("end")
@@ -1463,6 +1482,12 @@ class App:
         # update compact view with last log line
         short = msg if len(msg) <= 55 else msg[:52] + "…"
         self._compact_log_var.set(f"[{ts}] {short}")
+        # append to log file
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[{ts}] {msg}\n")
+        except Exception:
+            pass
 
     def _clear_log(self):
         self.log_box.config(state="normal")
@@ -2021,6 +2046,19 @@ class App:
                 self.root.after(0, lambda: self.log("Browser closed.", "ERROR"))
                 self.root.after(0, self.stop_monitoring); break
             if refresh_first: self._do_refresh()
+            if self._post_refresh_key:
+                load_s = self.load_var.get()
+                if load_s > 0:
+                    self.root.after(0, lambda s=load_s:
+                        self.log(f"  ⏱  page-load wait {s}s…"))
+                    if not self._sleep(load_s): break
+                try:
+                    ActionChains(self.driver).send_keys(self._post_refresh_key).perform()
+                    k = self._post_refresh_key
+                    self.root.after(0, lambda k=k: self.log(f"  ⌨  sent key '{k}' after refresh", "OK"))
+                except Exception as e:
+                    err = str(e)
+                    self.root.after(0, lambda e=err: self.log(f"  ✗  key error: {e}", "ERROR"))
 
             # ── VIDEO DETECT MODE (e.g. DAZN) ─────────────────────────────────
             # No click targets — refresh and check if video started playing via JS.
