@@ -2,6 +2,268 @@ OTT AutoClicker — Changelog
 ===========================
 
 
+v1.0.84 — Pre-check: pametno vrijeme provjere + VPN country check + HTML mailovi
+-----------------------------------------------------------------------
+- Pre-check logika: 00:00–04:59 → check u 23:00 prethodne večeri
+  05:00–23:59 → check 2 sata prije starta
+- VPN country check: per-platform provjera IP-a iz browsera
+  Sve Prime Video platforme imaju definiran expected country (US/IT/BR/GB/DE/ES/JP/MX/FR)
+  Ako IP ne odgovara, šalje se zasebni "VPN Wrong Country" mail
+- HTML mailovi: "Browser Disconnected" (crveni) i "VPN Wrong Country" (žuti)
+  Sadrže: Platform, Check time, Monitoring start, Until live, Error/IP detalji
+- SMTP konfiguracija: Amazon SES eu-central-1, from autoclicker@global-mmk.com
+  to recording@global-mmk.com
+- "Run precheck" gumb u Setup tabu za ručno pokretanje provjere
+- Scan button: čita vrijeme s browser stranice, oduzima offset, puni Start date/time
+- Scan time offset (min) spinbox u Setup tabu (advanced), per-platform via scan_offset rule
+  NBA Docomo default: 10 min
+
+v1.0.83 — Scan button: automatsko čitanje vremena s browser stranice
+-----------------------------------------------------------------------
+- Novi gumb "Scan" pored End time na Monitor tabu
+- Čita tekst trenutno otvorene stranice u Selenium browseru
+- Traži YYYY/MM/DD HH:MM format (npr. NBA Docomo countdown timer)
+- Fallback: traži samo HH:MM ako nema punog datuma
+- Oduzima konfigurirani offset (minuta) i puni Start date + Start time
+- Novi spinbox "Scan time offset (min):" u Setup tabu (advanced mode)
+  ispod "Scroll after click", default 60 min
+- Per-platform scan offset u PLATFORM_RULES ("scan_offset" key)
+  npr. NBA Docomo = 10 min
+- Logira rezultat scana u Monitor log (teal boja)
+
+v1.0.82 — Nova platforma: DAZN IT
+-----------------------------------------------------------------------
+- Dodana platforma "DAZN IT" (https://www.dazn.com/en-IT)
+- Konfiguracija identična DAZN DE/DAZN ES (video_detect, refresh_first,
+  load_wait 60s, freeze_recovery: refresh_only)
+- AntiFreeze default ON (kao DAZN DE i DAZN ES)
+- Default browser: Chrome (DAZN ES koristi Edge, DAZN IT ne)
+
+v1.0.81 — DatePickerWidget: DD-MM picker sa strelicama
+-----------------------------------------------------------------------
+- Novi DatePickerWidget: prikazuje samo DD-MM (godina skrivena vizualno)
+- Strelice gore/dolje mijenjaju dan ili mjesec s wraparound
+- Auto-jump na MM nakon unosa 2 znaka dana
+- Interno čuva puni YYYY-MM-DD format (kompatibilno s _parse_dt)
+- Dan se automatski clampira prema broju dana u mjesecu
+- Koristi se na sva 4 mjesta: Monitor start/end, Freeze start/end
+- Maknut "+" gumb za datum (više nije potreban)
+
+v1.0.80 — TimePickerWidget: HH:MM picker s klik-selekcijom
+-----------------------------------------------------------------------
+- Novi TimePickerWidget: dva Entry widgeta (HH i MM) s ":" između
+- Klik na sate selektira samo sate, klik na minute samo minute
+- Strelice gore/dolje mijenjaju vrijednost s wraparound (23→0, 59→0)
+- Auto-jump na minute nakon unosa 2 znake sata
+- Koristi se na sva 4 mjesta: Monitor start/end, Freeze start/end
+- End time widgeti podržavaju praznu vrijednost (allow_empty=True)
+- Potpuno kompatibilan s postojećim .get()/.set() pozivima
+
+v1.0.79 — Pre-check: IP/VPN info iz browsera
+-----------------------------------------------------------------------
+- Nakon uspješnog browser pre-checka, otvara novi tab i dohvaća
+  IP info s ipinfo.io/json — reflektira proxy/VPN ekstenziju u browseru
+- Logira: IP adresu, grad, državu i ISP/VPN provider name
+  npr. "Browser IP: 185.x.x.x | Amsterdam, NL | AS... NordVPN"
+- Tab se automatski zatvara nakon provjere, vraća se na originalni tab
+- Ako dohvat ne uspije, logira upozorenje (ne blokira ostalo)
+
+v1.0.78 — Pre-check: provjera browser konekcije 2h prije starta
+-----------------------------------------------------------------------
+- Novi mehanizam: 2 sata prije zadanog start timea, provjeri je li
+  Selenium driver još uvijek spojen (driver.execute_script("return 1"))
+- Ako provjera uspije: logiraj "Pre-check OK" u log
+- Ako provjera ne uspije: logiraj ERROR i pošalji mail notifikaciju
+  sa subject: "🔴 AC - Browser Disconnected [Platforma]"
+- SMTP konfiguracija u kodu: PRECHECK_SMTP_USER/PASS/HOST/PORT/MAIL_TO
+  (prazno po defaultu — ako nije konfigurirano, samo logira upozorenje)
+- Ako je start time < 2h od pokretanja monitoringa, pre-check se preskače
+- Pre-check thread se automatski gasi ako se monitoring zaustavi
+
+v1.0.77 — Dodana platforma Hotstar
+-----------------------------------------------------------------------
+- Hotstar: https://www.hotstar.com/in/home
+- Default browser: Edge, default veličina: MD — 650×550
+- Bez selektora za sada (platforma dodana radi pristupa)
+
+v1.0.76 — DStv: profile-chooser recovery korak za freeze
+-----------------------------------------------------------------------
+- Nakon freeze refresha, DStv se nekad vrati na profile chooser
+- Novi mehanizam freeze_profile_selector: provjeri i klikni avatar
+  profila ako je prisutan, prije nastavka monitoringa
+- DStv: freeze_profile_selector = //img[contains(@class,"Avatar_avatar__jkjO-")]
+- Ako avatar nije prisutan, nastavlja normalno (video se sam nastavio)
+
+v1.0.75 — Coupang Play: fix selektor za "Watch Live Now"
+-----------------------------------------------------------------------
+- Selektor //*[@data-cy="playCtaButtonText"] je matchao i "Upcoming"
+  i "Watch Live Now" gumbe (isti data-cy atribut)
+- Dodan uvjet contains(.,"Watch Live Now") — sada klika samo gumb
+  koji je live, ne i nadolazeće programe
+
+v1.0.74 — Stan: freeze detection via Shadow DOM
+-----------------------------------------------------------------------
+- Stan: video je unutar Shadow DOM (<stan-player> custom element)
+- Novi mehanizam freeze_video_js: custom JS za čitanje currentTime po platformi
+  umjesto globalnog querySelectorAll('video')
+- Stan: freeze_video_js koristi stan-player.shadowRoot.querySelector('video')
+  — ispravno čita currentTime=2073s
+
+v1.0.73 — Stan: dispatch_click za pokretanje videa
+-----------------------------------------------------------------------
+- Novi mehanizam dispatch_click: koristi dispatchEvent(MouseEvent) umjesto
+  arguments[0].click() — simulira pravi user gesture što Stan zahtijeva
+  za autoplay (browser autoplay policy blokira obični JS click)
+- Stan: dispatch_click enabled (uz force_js_click)
+
+v1.0.72 — Log: datum u timestamp + auto-save u fajl
+-----------------------------------------------------------------------
+- Monitor i Freeze logovi: timestamp promijenjen iz HH:MM:SS u DD-MM HH:MM:SS
+- Auto-save logova: svaka log linija se append-a u logs.txt u root folderu
+- Freeze logovi se zapisuju s prefiksom [FREEZE] da se razlikuju od monitor logova
+- Fajl se nikad ne briše automatski — raste s vremenom
+
+v1.0.71 — Fubo: nova platforma + post_refresh_key mehanizam
+-----------------------------------------------------------------------
+- Fubo: dodana platforma, URL https://www.fubo.tv/
+- Fubo: Chrome browser, MD browser size, refresh_first, load_wait 10s
+- Fubo: post_refresh_key = " " (space) — šalje space nakon refresha da pokrene video
+- Freeze Detection: ručno po potrebi (nije ON po defaultu)
+- Novi mehanizam post_refresh_key: šalje key press nakon refresha i load_wait,
+  neovisno o click targetima — korisno za platforme koje trebaju keypress za autoplay
+
+v1.0.70 — DStv: prebačen na video_detect mode (kao DAZN)
+-----------------------------------------------------------------------
+- DStv: više ne klikče button nego refresha i čeka da video krene (kao DAZN)
+- DStv: load_wait 60s, freeze_recovery refresh_only
+- DStv: stari click selector sačuvan u komentaru u kodu — lako vratiti ako
+  DStv opet zatreba klik (PlayerControls_buttonpause)
+
+v1.0.69 — Stan: force_js_click + FanCode: video detect popravci
+-----------------------------------------------------------------------
+- Novi mehanizam force_js_click: preskače Selenium clickability provjeru i
+  koristi direktni JS click (arguments[0].click()) — radi čak i kad element
+  ima width:0/height:0 (skriven u DOMu ali prisutan)
+- Stan: force_js_click enabled — Watch Live button je u DOMu ali skriven
+  dok live nije aktivan; JS click ga uspješno klikne
+- Stan: selector promijenjen na //span[contains(@class,"play__label") and text()="Watch Live"]
+- FanCode: load_wait povećan na 30s
+- FanCode: maknut !v.paused uvjet iz video_detect_js
+- FanCode: video_detect_key = "m" — unmute čim se detektira video
+
+v1.0.67 — Stan: nova platforma
+-----------------------------------------------------------------------
+- FanCode: load_wait povećan na 30s (video treba više vremena za učitavanje)
+- FanCode: maknut !v.paused uvjet iz video_detect_js — FanCode autoplay je
+  muted pa paused state nije pouzdan; dovoljno je currentTime > 0
+- Novi mehanizam video_detect_key: kada video_detect uspije, šalje se key press
+- FanCode: video_detect_key = "m" — unmute videa čim se detektira da igra
+
+v1.0.67 — Stan: nova platforma
+-----------------------------------------------------------------------
+- Stan: dodana platforma, URL https://play.stan.com.au/sport
+- Stan: Chrome browser, LG browser size (750×650), refresh_first
+- Stan: selector //a[contains(@class,"program__button--play")] (Watch Live button)
+
+v1.0.66 — SPOTV Now JP: pre-click login flow (finaliziran)
+-----------------------------------------------------------------------
+- Novi mehanizam: pre_click_targets — klikovi koji se izvršavaju PRIJE glavnog
+  click cyclea, bez Ctrl i bez tab switchinga (čisti plain click)
+- SPOTV Now JP: dodani pre-click targeti za auto-login flow:
+    1. //button[contains(@class,"login-btn")] — otvori login formu
+    2. //button[contains(@class,"default") and contains(.,"ログイン")] — potvrdi login
+  Ako element nije prisutan (korisnik je već logiran), pre-click se preskace (2s timeout)
+- pre_click_wait: 5s cekanja NAKON svakog pre-klika (ukljucujuci zadnji) da stranica reagira
+- Navigate na https://spotvnow.jp/schedule/0 samo ako je login flow bio triggered
+  (ako je korisnik vec logiran, navigate se preskace — ostaje na trenutnom URL-u)
+
+v1.0.64 — Tencent: nova platforma
+-----------------------------------------------------------------------
+- Tencent: dodana platforma, URL https://sports.qq.com/kbsweb/index.htm
+- Tencent: Chrome browser, SM browser size, Freeze Detection OFF (detalji TBD)
+
+v1.0.63 — FanCode: refresh_first + video_detect + freeze detection
+-----------------------------------------------------------------------
+- FanCode: refresh_first enabled (refreshes page before clicking)
+- FanCode: video_detect enabled — waits for video to start before stopping monitoring
+- FanCode: freeze_recovery set to refresh_only (same as DAZN)
+- FanCode: Freeze Detection ON by default
+
+v1.0.62 — Freeze Detection: fix video selector (always picks active video)
+-----------------------------------------------------------------------
+- Freeze Detection: querySelector('video') replaced with smarter selector —
+  now picks the first non-paused/active video element instead of always the
+  first one (which on Disney+ BR/AR is a placeholder with currentTime=0)
+- This fixes baseline=0.0 / false freeze stops on platforms with multiple
+  video elements (Disney+ BR, Disney+ AR confirmed affected)
+
+v1.0.61 — Disney+ AR + Freeze Detection manual start delay + misc fixes
+-----------------------------------------------------------------------
+- Disney+ AR: added "Watch Live" selector (live-modal-watch-live-action-button)
+- Disney+ AR: fixed click_delay default (2s), MD browser size, Edge browser, Freeze Detection ON
+- Disney+ AR: URL updated to https://www.disneyplus.com/en-gb/home
+- Disney+, Disney+ SE, Disney+ DK: added "Watch Live" selector (live-modal-watch-live-action-button)
+- Disney+ BR: new platform added, Edge browser, MD browser size, URL https://www.disneyplus.com/en-gb/home
+- Freeze Detection manual start: added 30s delay (same as automatic) so video has time to load
+  before first currentTime sample — fixes false baseline=0.0 when started manually
+- Edge browser: --disable-gpu flag now applied to Edge as well (was Chrome only)
+- install.bat: added PowerShell fallback if curl fails to download Python installer
+
+
+v1.0.60 — Freeze Detection: zero-baseline protection + max retry limit
+-----------------------------------------------------------------------
+- Skip-if-zero-on-first-sample: if baseline currentTime=0.0 (video not started yet),
+  freeze detection skips that cycle and retries — up to 3 times before giving up
+- Max retry limit: if freeze recovery runs 3 consecutive times and currentTime stays 0.0
+  (video unresponsive), freeze detection stops automatically with a warning
+- Prevents infinite refresh loops when video player fails to load or currentTime is unavailable
+- Both counters reset to 0 whenever a healthy currentTime (>0.0) is detected
+
+
+v1.0.59 — FanCode platform added
+----------------------------------
+- Added FanCode platform (fancode.com)
+- Default browser: Edge
+- Default browser size: LG (750×650)
+- Freeze Detection disabled by default (click selectors TBD after first live test)
+
+
+v1.0.58 — Freeze Detection threshold tuned
+-------------------------------------------
+- Freeze threshold changed from 80% of CHECK_INTERVAL (24s) to a fixed 15s
+- Video must advance at least 15s per 30s check interval to be considered healthy
+- Reduces false positives during heavy buffering (buffering pause of ~15s will still pass)
+- Still catches real freezes where currentTime stops completely
+
+
+v1.0.57 — DStv platform + indefinite Freeze Detection
+-------------------------------------------------------
+- Added DStv platform (dstv.stream/#/livetv/sport, Edge default)
+- No click monitoring — Freeze Detection only
+- Freeze Detection enabled by default for DStv
+- End date/time cleared automatically on DStv select (no end time)
+- Freeze Detection now supports indefinite mode: if End date/time fields are empty, runs until manually stopped
+- Log shows "runs until ∞ (no end time)" when no end time is set
+- End time check skipped in freeze loop when running indefinitely
+
+
+v1.0.56 — Disable GPU + manual Freeze Detection start
+-------------------------------------------------------
+- Added --disable-gpu flag for Chrome (not Edge)
+- Disables hardware graphics acceleration in Chrome
+- Fixes black screen on some PC configurations
+- Added "▶ Start Freeze Detection" button in Freeze tab
+- Starts Freeze Detection immediately without prior monitoring
+- End time: uses entered End date/time, or now+4h if empty
+- Start button disables while freeze is running, re-enables when stopped
+
+
+v1.0.55 — Freeze Detection defaults
+-------------------------------------
+- Freeze Detection enabled by default for all Prime Video platforms (USA, IT, BR, UK, DE, ES, JP, MX, FR)
+- DAZN DE and ES remain unchanged (already enabled by default)
+
+
 v1.0.1 — Initial release
 --------------------------
 - Basic tkinter GUI with Setup and Monitor tabs
@@ -366,10 +628,10 @@ v1.0.37 — EdgeDriver auto version check + DAZN ES
 
 v1.0.54 — EdgeDriver auto-cache
 ---------------------------------
-- Nakon što Selenium Manager skine novi EdgeDriver, app ga kopira u lokalni app folder
-- Sljedeće otvaranje browsera nađe lokalni driver odmah — nema 40s čekanja
-- Kopiranje se radi samo ako verzija drivera odgovara instaliranom Edgeu
-- Greška pri kopiranju je non-fatal — tiho logira WARN i nastavlja normalno
+- After Selenium Manager downloads a new EdgeDriver, the app copies it to the local app folder
+- Next browser open finds the local driver immediately — no 40s wait
+- Copy only happens if driver version matches installed Edge version
+- Copy failure is non-fatal — silently logs WARN and continues normally
 
 
 v1.0.53 — Simple/Advanced Mode + UI polish
