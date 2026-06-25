@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.84"
+VERSION = "1.0.85"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -1695,8 +1695,9 @@ class App:
             messagebox.showerror("Scan", f"Could not read page: {e}")
             return
 
-        # Try to find YYYY/MM/DD HH:MM format first (e.g. NBA Docomo: 2026/06/24 08:45)
         dt_found = None
+
+        # 1. YYYY/MM/DD HH:MM or YYYY-MM-DD HH:MM (e.g. NBA Docomo: 2026/06/24 08:45)
         m = re.search(r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})\s+(\d{1,2}):(\d{2})', page_text)
         if m:
             try:
@@ -1707,13 +1708,36 @@ class App:
             except ValueError:
                 dt_found = None
 
-        # Fallback: plain HH:MM (uses today's date)
+        # 2. Amazon format: "Jun 26, 2026 12:30 AM" / "Jun 26, 2026 12:30 AM CEST"
         if dt_found is None:
-            m2 = re.search(r'\b(\d{1,2}):(\d{2})\b', page_text)
+            MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+                      "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
+            m2 = re.search(
+                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)',
+                page_text, re.IGNORECASE)
             if m2:
                 try:
+                    mon  = MONTHS[m2.group(1).capitalize()]
+                    day  = int(m2.group(2))
+                    year = int(m2.group(3))
+                    hour = int(m2.group(4))
+                    mins = int(m2.group(5))
+                    ampm = m2.group(6).upper()
+                    if ampm == "PM" and hour != 12:
+                        hour += 12
+                    elif ampm == "AM" and hour == 12:
+                        hour = 0
+                    dt_found = datetime.datetime(year, mon, day, hour, mins)
+                except ValueError:
+                    dt_found = None
+
+        # 3. Fallback: plain HH:MM (uses today's date)
+        if dt_found is None:
+            m3 = re.search(r'\b(\d{1,2}):(\d{2})\b', page_text)
+            if m3:
+                try:
                     now = datetime.datetime.now()
-                    dt_found = now.replace(hour=int(m2.group(1)), minute=int(m2.group(2)),
+                    dt_found = now.replace(hour=int(m3.group(1)), minute=int(m3.group(2)),
                                            second=0, microsecond=0)
                 except ValueError:
                     dt_found = None
