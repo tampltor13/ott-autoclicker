@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """OTT AutoClicker – compatible with Python 3.9 / macOS system Tk"""
 from __future__ import annotations
-import os, sys, platform, time, threading, datetime, subprocess
+import os, sys, platform, time, threading, datetime, subprocess, re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import urllib.request
@@ -35,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.74"
+VERSION = "1.0.84"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -54,6 +57,7 @@ PLATFORMS = {
     "Prime Video FR": "https://www.primevideo.com",
     "DAZN DE":      "https://www.dazn.com/en-DE/home",
     "DAZN ES":      "https://www.dazn.com/en-ES/home",
+    "DAZN IT":      "https://www.dazn.com/en-IT",
     "DStv":         "https://dstv.stream/#/livetv/sport",
     "Peacock":      "https://www.peacocktv.com/watch/home",
     "Coupang Play": "https://www.coupangplay.com",
@@ -70,6 +74,7 @@ PLATFORMS = {
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
     "Stan":       "https://play.stan.com.au/sport",
     "Fubo":       "https://www.fubo.tv/",
+    "Hotstar":    "https://www.hotstar.com/in/home",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -145,7 +150,7 @@ PLATFORM_RULES = {
     },
     "Coupang Play": {
         "selector":      "XPath",
-        "targets":       '//*[@data-cy="playCtaButtonText"]',
+        "targets":       '//*[@data-cy="playCtaButtonText" and contains(.,"Watch Live Now")]',
         "refresh_first": True,
         "click_delay":   2,
     },
@@ -173,6 +178,7 @@ PLATFORM_RULES = {
         "scroll_after":  290,
         "load_wait":     5,
         "key_press":     " ",
+        "scan_offset":   10,
     },
     "Paramount+": {
         "selector":      "XPath",
@@ -228,6 +234,13 @@ PLATFORM_RULES = {
         "load_wait":       60,
         "freeze_recovery": "refresh_only",
     },
+    "DAZN IT": {
+        "video_detect":    True,
+        "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":   True,
+        "load_wait":       60,
+        "freeze_recovery": "refresh_only",
+    },
     "DStv": {
         # OLD click mode (keep for reference, re-enable if DStv breaks again):
         # "selector":           "XPath",
@@ -243,6 +256,7 @@ PLATFORM_RULES = {
         "freeze_default":  True,
         "freeze_no_end":   True,
         "freeze_recovery": "refresh_only",
+        "freeze_profile_selector": '//img[contains(@class,"Avatar_avatar__jkjO-")]',
     },
     "Tencent": {
         "selector":      "XPath",
@@ -286,6 +300,30 @@ BY_MAP = {
 }
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_profiles")
 LOG_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs.txt")
+
+# ── Pre-check email config ────────────────────────────────────────────────────
+PRECHECK_SMTP_HOST = "email-smtp.eu-central-1.amazonaws.com"
+PRECHECK_SMTP_PORT = 587
+PRECHECK_SMTP_USER = "AKIASYS2V2QNWFGVDGRW"
+PRECHECK_SMTP_PASS = "BCx9MkQKoDIHwXNPetBIzhgOw/dFbuJxRW6Y0h1udt9y"
+PRECHECK_MAIL_FROM = "autoclicker@global-mmk.com"
+PRECHECK_MAIL_TO   = "recording@global-mmk.com"
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Per-platform required VPN country (ISO 3166-1 alpha-2) ───────────────────
+# If platform is in this dict, pre-check will verify browser IP matches country.
+PLATFORM_VPN_COUNTRY = {
+    "Prime Video USA": "US",
+    "Prime Video IT":  "IT",
+    "Prime Video BR":  "BR",
+    "Prime Video UK":  "GB",
+    "Prime Video DE":  "DE",
+    "Prime Video ES":  "ES",
+    "Prime Video JP":  "JP",
+    "Prime Video MX":  "MX",
+    "Prime Video FR":  "FR",
+}
+# ─────────────────────────────────────────────────────────────────────────────
 MONO_FONT   = ("Menlo", 11) if IS_MAC else ("Consolas", 11)
 
 
@@ -316,6 +354,277 @@ class Tooltip:
 
 
 PREFS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prefs.json")
+
+
+class TimePickerWidget(ttk.Frame):
+    """HH:MM time picker — click hours or minutes to select, arrows to change.
+
+    Compatible with existing .get() / .set() usage via self.var (StringVar, "HH:MM" or "").
+    Supports empty value (for optional end-time fields) via allow_empty=True.
+    """
+
+    def __init__(self, parent, var: tk.StringVar, allow_empty: bool = False, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.var         = var
+        self.allow_empty = allow_empty
+        self._updating   = False
+
+        # internal vars for the two entry boxes
+        self._hvar = tk.StringVar()
+        self._mvar = tk.StringVar()
+
+        # sync internal vars from external var
+        self._sync_from_var()
+        # whenever external var changes (e.g. .set() calls), sync inward
+        self.var.trace_add("write", self._on_var_write)
+
+        # ── build widgets ────────────────────────────────────────────────────
+        vcmd_h = (self.register(lambda s: len(s) <= 2 and (s == "" or s.isdigit())), "%P")
+        vcmd_m = (self.register(lambda s: len(s) <= 2 and (s == "" or s.isdigit())), "%P")
+
+        self._h_entry = ttk.Entry(self, textvariable=self._hvar, width=3,
+                                  justify="center", validate="key",
+                                  validatecommand=vcmd_h)
+        self._sep = ttk.Label(self, text=":")
+        self._m_entry = ttk.Entry(self, textvariable=self._mvar, width=3,
+                                  justify="center", validate="key",
+                                  validatecommand=vcmd_m)
+
+        self._h_entry.pack(side="left")
+        self._sep.pack(side="left", padx=1)
+        self._m_entry.pack(side="left")
+
+        # ── bindings ─────────────────────────────────────────────────────────
+        for entry, is_hour in ((self._h_entry, True), (self._m_entry, False)):
+            entry.bind("<Up>",       lambda e, h=is_hour: self._step(h, +1))
+            entry.bind("<Down>",     lambda e, h=is_hour: self._step(h, -1))
+            entry.bind("<FocusIn>",  lambda e: e.widget.select_range(0, "end"))
+            entry.bind("<FocusOut>", lambda e, h=is_hour: self._on_focus_out(h))
+            entry.bind("<KeyRelease>", lambda e, h=is_hour: self._on_key(e, h))
+
+        # click on ":" label focuses hours
+        self._sep.bind("<Button-1>", lambda e: self._h_entry.focus_set())
+
+    # ── internal helpers ──────────────────────────────────────────────────────
+
+    def _sync_from_var(self):
+        """Push external var value → internal _hvar/_mvar."""
+        val = self.var.get().strip()
+        if val and ":" in val:
+            parts = val.split(":")
+            self._hvar.set(parts[0].zfill(2))
+            self._mvar.set(parts[1][:2].zfill(2))
+        else:
+            self._hvar.set("")
+            self._mvar.set("")
+
+    def _sync_to_var(self):
+        """Push internal _hvar/_mvar → external var."""
+        h = self._hvar.get().strip()
+        m = self._mvar.get().strip()
+        if h == "" and m == "" and self.allow_empty:
+            self._updating = True
+            self.var.set("")
+            self._updating = False
+        elif h.isdigit() and m.isdigit():
+            self._updating = True
+            self.var.set(f"{int(h):02d}:{int(m):02d}")
+            self._updating = False
+
+    def _on_var_write(self, *_):
+        """External .set() called — update internal entries."""
+        if not self._updating:
+            self._sync_from_var()
+
+    def _on_focus_out(self, is_hour: bool):
+        """Validate and zero-pad on focus out."""
+        if is_hour:
+            val = self._hvar.get().strip()
+            if val.isdigit():
+                v = max(0, min(23, int(val)))
+                self._hvar.set(f"{v:02d}")
+            elif val == "" and self.allow_empty:
+                self._mvar.set("")
+        else:
+            val = self._mvar.get().strip()
+            if val.isdigit():
+                v = max(0, min(59, int(val)))
+                self._mvar.set(f"{v:02d}")
+        self._sync_to_var()
+
+    def _on_key(self, event, is_hour: bool):
+        """Auto-jump to minutes after 2 digits in hours field."""
+        if is_hour:
+            val = self._hvar.get().strip()
+            if len(val) == 2 and val.isdigit():
+                # clamp immediately
+                v = max(0, min(23, int(val)))
+                self._hvar.set(f"{v:02d}")
+                self._m_entry.focus_set()
+                self._m_entry.select_range(0, "end")
+        self._sync_to_var()
+
+    def _step(self, is_hour: bool, delta: int):
+        """Arrow key — increment/decrement with wraparound."""
+        if is_hour:
+            val = self._hvar.get().strip()
+            cur = int(val) if val.isdigit() else 0
+            new = (cur + delta) % 24
+            self._hvar.set(f"{new:02d}")
+        else:
+            val = self._mvar.get().strip()
+            cur = int(val) if val.isdigit() else 0
+            new = (cur + delta) % 60
+            self._mvar.set(f"{new:02d}")
+        self._sync_to_var()
+        return "break"  # prevent default tkinter behaviour
+
+    # ── public API ────────────────────────────────────────────────────────────
+
+    def get(self) -> str:
+        """Return current value as 'HH:MM' or '' if empty."""
+        return self.var.get()
+
+    def set(self, value: str):
+        """Set value — delegates to var which triggers _on_var_write."""
+        self.var.set(value)
+
+
+class DatePickerWidget(ttk.Frame):
+    """DD-MM date picker — arrows change day/month, internally stores YYYY-MM-DD.
+
+    var (StringVar) holds the full "YYYY-MM-DD" string used by _parse_dt.
+    Visually shows only DD-MM. allow_empty=True supports optional end-date fields.
+    """
+
+    def __init__(self, parent, var: tk.StringVar, allow_empty: bool = False, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.var         = var
+        self.allow_empty = allow_empty
+        self._updating   = False
+
+        self._dvar = tk.StringVar()
+        self._mvar = tk.StringVar()
+
+        self._sync_from_var()
+        self.var.trace_add("write", self._on_var_write)
+
+        vcmd = (self.register(lambda s: len(s) <= 2 and (s == "" or s.isdigit())), "%P")
+
+        self._d_entry = ttk.Entry(self, textvariable=self._dvar, width=3,
+                                  justify="center", validate="key", validatecommand=vcmd)
+        self._sep = ttk.Label(self, text="-")
+        self._m_entry = ttk.Entry(self, textvariable=self._mvar, width=3,
+                                  justify="center", validate="key", validatecommand=vcmd)
+
+        self._d_entry.pack(side="left")
+        self._sep.pack(side="left", padx=1)
+        self._m_entry.pack(side="left")
+
+        for entry, is_day in ((self._d_entry, True), (self._m_entry, False)):
+            entry.bind("<Up>",        lambda e, d=is_day: self._step(d, +1))
+            entry.bind("<Down>",      lambda e, d=is_day: self._step(d, -1))
+            entry.bind("<FocusIn>",   lambda e: e.widget.select_range(0, "end"))
+            entry.bind("<FocusOut>",  lambda e, d=is_day: self._on_focus_out(d))
+            entry.bind("<KeyRelease>", lambda e, d=is_day: self._on_key(e, d))
+
+        self._sep.bind("<Button-1>", lambda e: self._d_entry.focus_set())
+
+    def _year(self) -> int:
+        raw = self.var.get().strip()
+        if raw and len(raw) >= 4:
+            try:
+                return int(raw[:4])
+            except ValueError:
+                pass
+        return datetime.datetime.now().year
+
+    def _max_day(self, month: int, year: int) -> int:
+        import calendar
+        return calendar.monthrange(year, month)[1]
+
+    def _sync_from_var(self):
+        raw = self.var.get().strip()
+        if raw and len(raw) == 10:
+            try:
+                d = datetime.datetime.strptime(raw, "%Y-%m-%d")
+                self._dvar.set(f"{d.day:02d}")
+                self._mvar.set(f"{d.month:02d}")
+                return
+            except ValueError:
+                pass
+        self._dvar.set("")
+        self._mvar.set("")
+
+    def _sync_to_var(self):
+        d = self._dvar.get().strip()
+        m = self._mvar.get().strip()
+        if d == "" and m == "" and self.allow_empty:
+            self._updating = True
+            self.var.set("")
+            self._updating = False
+        elif d.isdigit() and m.isdigit():
+            year  = self._year()
+            month = max(1, min(12, int(m)))
+            day   = max(1, min(self._max_day(month, year), int(d)))
+            self._updating = True
+            self.var.set(f"{year:04d}-{month:02d}-{day:02d}")
+            self._updating = False
+
+    def _on_var_write(self, *_):
+        if not self._updating:
+            self._sync_from_var()
+
+    def _on_focus_out(self, is_day: bool):
+        if is_day:
+            val = self._dvar.get().strip()
+            if val.isdigit():
+                year  = self._year()
+                month = int(self._mvar.get()) if self._mvar.get().strip().isdigit() else 1
+                self._dvar.set(f"{max(1, min(self._max_day(month, year), int(val))):02d}")
+            elif val == "" and self.allow_empty:
+                self._mvar.set("")
+        else:
+            val = self._mvar.get().strip()
+            if val.isdigit():
+                self._mvar.set(f"{max(1, min(12, int(val))):02d}")
+        self._sync_to_var()
+
+    def _on_key(self, event, is_day: bool):
+        if is_day:
+            val = self._dvar.get().strip()
+            if len(val) == 2 and val.isdigit():
+                year  = self._year()
+                month = int(self._mvar.get()) if self._mvar.get().strip().isdigit() else 1
+                v = max(1, min(self._max_day(month, year), int(val)))
+                self._dvar.set(f"{v:02d}")
+                self._m_entry.focus_set()
+                self._m_entry.select_range(0, "end")
+        self._sync_to_var()
+
+    def _step(self, is_day: bool, delta: int):
+        year = self._year()
+        if is_day:
+            val   = self._dvar.get().strip()
+            month = int(self._mvar.get()) if self._mvar.get().strip().isdigit() else 1
+            cur   = int(val) if val.isdigit() else 1
+            maxd  = self._max_day(month, year)
+            new   = (cur - 1 + delta) % maxd + 1
+            self._dvar.set(f"{new:02d}")
+        else:
+            val = self._mvar.get().strip()
+            cur = int(val) if val.isdigit() else 1
+            new = (cur - 1 + delta) % 12 + 1
+            self._mvar.set(f"{new:02d}")
+        self._sync_to_var()
+        return "break"
+
+    def get(self) -> str:
+        return self.var.get()
+
+    def set(self, value: str):
+        self.var.set(value)
+
 
 class App:
     def __init__(self, root):
@@ -418,6 +727,9 @@ class App:
         ttk.Button(ip_frame, text="↺", width=2,
                    command=lambda: threading.Thread(target=self._fetch_ip, daemon=True).start()
                    ).pack(side="left", padx=(6, 0))
+        ttk.Button(ip_frame, text="Run precheck", width=13,
+                   command=lambda: threading.Thread(target=self._run_precheck_now, daemon=True).start()
+                   ).pack(side="left", padx=(12, 0))
         r += 1
         # browser radio buttons
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
@@ -522,6 +834,7 @@ class App:
         self._video_detect_key   = ""
         self._freeze_video_js    = ""
         self._freeze_recovery    = "refresh_only"
+        self._freeze_profile_selector = ""
         r += 1
 
         # selector type
@@ -612,6 +925,22 @@ class App:
         self._adv_widgets += [(_lscroll, "grid"), (f_scroll, "grid"), (f_fd, "grid")]
         r += 1
 
+        # scan offset
+        _lscan = ttk.Label(p, text="Scan time offset (min):"); _lscan.grid(row=r, column=0, sticky="w", pady=3)
+        self.scan_offset_var = tk.IntVar(value=60)
+        f_scan = ttk.Frame(p); f_scan.grid(row=r, column=1, sticky="w", padx=8)
+        tk.Spinbox(f_scan, from_=0, to=480, textvariable=self.scan_offset_var,
+                   width=8, bg="#3c3c3c", fg="#ffffff",
+                   buttonbackground="#555555", insertbackground="#ffffff").pack(side="left")
+        i_scan = ttk.Label(f_scan, text=" ⓘ", foreground="#888888", cursor="hand2")
+        i_scan.pack(side="left")
+        Tooltip(i_scan, "Minutes to subtract from the scanned time.\n"
+                        "e.g. if the page shows 08:45 and offset is 60,\n"
+                        "Start time will be set to 07:45.\n"
+                        "Set to 0 to use the exact time found on the page.")
+        self._adv_widgets += [(_lscan, "grid"), (f_scan, "grid")]
+        r += 1
+
         p.columnconfigure(1, weight=1)
         p.columnconfigure(3, weight=1)
         self._advanced_mode = True   # trick toggle into going simple on first call
@@ -625,56 +954,58 @@ class App:
         now = datetime.datetime.now()
         r = 0
 
-        ttk.Label(p, text="Start date:").grid(row=r, column=0, sticky="w", pady=3)
+        gm = ttk.Frame(p); gm.grid(row=r, column=0, columnspan=4, sticky="w"); r += 1
+
+        ttk.Label(gm, text="Start date:").grid(row=0, column=0, sticky="w", pady=3)
         self.start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
-        sd_frame = ttk.Frame(p); sd_frame.grid(row=r, column=1, sticky="w", padx=8)
-        ttk.Entry(sd_frame, textvariable=self.start_date, width=11).pack(side="left")
+        sd_frame = ttk.Frame(gm); sd_frame.grid(row=0, column=1, sticky="w", padx=8)
+        DatePickerWidget(sd_frame, self.start_date).pack(side="left")
         ttk.Button(sd_frame, text="+", width=2,
                    command=lambda: self._shift_date(self.start_date, +1)).pack(side="left", padx=(3, 0))
-        ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
+        ttk.Label(gm, text="Time (HH:MM):").grid(row=0, column=2, sticky="w")
+        st_frame = ttk.Frame(gm); st_frame.grid(row=0, column=3, sticky="w", padx=8)
         self.start_time = tk.StringVar(value=now.strftime("%H:%M"))
-        st_frame = ttk.Frame(p)
-        st_frame.grid(row=r, column=3, sticky="w", padx=8)
-        ttk.Entry(st_frame, textvariable=self.start_time, width=6).pack(side="left")
-        ttk.Button(st_frame, text="Now", width=4,
-                   command=self._set_start_now).pack(side="left", padx=(4, 0)); r += 1
+        TimePickerWidget(st_frame, self.start_time).pack(side="left")
+        ttk.Button(st_frame, text="Now", width=6,
+                   command=self._set_start_now).pack(side="left", padx=(4, 0))
 
-        ttk.Label(p, text="End date:").grid(row=r, column=0, sticky="w", pady=3)
+        ttk.Label(gm, text="End date:").grid(row=1, column=0, sticky="w", pady=3)
         self.end_date = tk.StringVar(value="")
-        ed_frame = ttk.Frame(p); ed_frame.grid(row=r, column=1, sticky="w", padx=8)
-        ttk.Entry(ed_frame, textvariable=self.end_date, width=11).pack(side="left")
+        ed_frame = ttk.Frame(gm); ed_frame.grid(row=1, column=1, sticky="w", padx=8)
+        DatePickerWidget(ed_frame, self.end_date, allow_empty=True).pack(side="left")
         ttk.Button(ed_frame, text="+", width=2,
                    command=lambda: self._shift_date(self.end_date, +1)).pack(side="left", padx=(3, 0))
-        ttk.Label(p, text="Time (HH:MM):").grid(row=r, column=2, sticky="w")
+        ttk.Label(gm, text="Time (HH:MM):").grid(row=1, column=2, sticky="w")
+        et_frame = ttk.Frame(gm); et_frame.grid(row=1, column=3, sticky="w", padx=8)
         self.end_time = tk.StringVar(value="")
-        ttk.Entry(p, textvariable=self.end_time, width=6).grid(
-            row=r, column=3, sticky="w", padx=8)
-        ttk.Label(p, text="(leave empty = run indefinitely)", foreground="#888888").grid(
-            row=r+1, column=1, columnspan=3, sticky="w", padx=8); r += 2
-
+        TimePickerWidget(et_frame, self.end_time, allow_empty=True).pack(side="left")
+        ttk.Button(et_frame, text="Scan", width=6,
+                   command=self._scan_time).pack(side="left", padx=(6, 0))
 
         ttk.Separator(p, orient="horizontal").grid(
             row=r, column=0, columnspan=4, sticky="ew", pady=6); r += 1
 
-        bf = ttk.Frame(p); bf.grid(row=r, column=0, columnspan=4, sticky="w"); r += 1
-        self.start_btn = ttk.Button(bf, text="▶  Start Monitoring",
-                                    command=self.start_monitoring)
-        self.start_btn.pack(side="left", padx=(0,6))
+        bf = ttk.Frame(p); bf.grid(row=r, column=0, columnspan=4, sticky="ew"); r += 1
+        self._monitor_status_var = tk.StringVar(value="Monitoring inactive")
+        ttk.Label(bf, textvariable=self._monitor_status_var,
+                  foreground="#f0c040").pack(side="left", padx=(0, 12))
         self.stop_btn = ttk.Button(bf, text="■  Stop Monitoring",
                                    command=self.stop_monitoring, state="disabled")
-        self.stop_btn.pack(side="left")
+        self.stop_btn.pack(side="right")
+        self.start_btn = ttk.Button(bf, text="▶  Start Monitoring",
+                                    command=self.start_monitoring)
+        self.start_btn.pack(side="right", padx=(0, 6))
 
         ttk.Separator(p, orient="horizontal").grid(
             row=r, column=0, columnspan=4, sticky="ew", pady=6); r += 1
-
-        ttk.Label(p, text="Log:").grid(row=r, column=0, sticky="w"); r += 1
         self.log_box = scrolledtext.ScrolledText(p, width=58, height=16,
                                                   state="disabled", font=MONO_FONT)
         self.log_box.grid(row=r, column=0, columnspan=4, sticky="nsew")
-        self.log_box.tag_config("OK",    foreground="green")
-        self.log_box.tag_config("WARN",  foreground="darkorange")
-        self.log_box.tag_config("ERROR", foreground="red")
-        self.log_box.tag_config("HEAD",  foreground="purple"); r += 1
+        self.log_box.tag_config("OK",       foreground="green")
+        self.log_box.tag_config("WARN",     foreground="darkorange")
+        self.log_box.tag_config("ERROR",    foreground="red")
+        self.log_box.tag_config("HEAD",     foreground="purple")
+        self.log_box.tag_config("PRECHECK", foreground="#4fc3f7"); r += 1
 
         ttk.Button(p, text="Clear log", command=self._clear_log).grid(
             row=r, column=3, sticky="e", pady=4)
@@ -689,47 +1020,49 @@ class App:
         p.pack(fill="both", expand=True)
 
         # date/time fields
-        gf = ttk.Frame(p); gf.pack(fill="x", pady=(0, 6))
+        gf = ttk.Frame(p); gf.pack(fill="x")
         now = datetime.datetime.now()
 
         ttk.Label(gf, text="Start date:").grid(row=0, column=0, sticky="w", pady=3)
         self._freeze_start_date = tk.StringVar(value=now.strftime("%Y-%m-%d"))
         fsd_frame = ttk.Frame(gf); fsd_frame.grid(row=0, column=1, sticky="w", padx=8)
-        ttk.Entry(fsd_frame, textvariable=self._freeze_start_date, width=11).pack(side="left")
+        DatePickerWidget(fsd_frame, self._freeze_start_date).pack(side="left")
         ttk.Button(fsd_frame, text="+", width=2,
                    command=lambda: self._shift_date(self._freeze_start_date, +1)).pack(side="left", padx=(3, 0))
         ttk.Label(gf, text="Time (HH:MM):").grid(row=0, column=2, sticky="w")
         self._freeze_start_time = tk.StringVar(value=now.strftime("%H:%M"))
-        ttk.Entry(gf, textvariable=self._freeze_start_time, width=6).grid(row=0, column=3, sticky="w", padx=8)
+        fst_frame = ttk.Frame(gf); fst_frame.grid(row=0, column=3, sticky="w", padx=8)
+        TimePickerWidget(fst_frame, self._freeze_start_time).pack(side="left")
+        ttk.Button(fst_frame, text="Now", width=6,
+                   command=lambda: self._freeze_start_time.set(
+                       datetime.datetime.now().strftime("%H:%M"))).pack(side="left", padx=(4, 0))
 
         ttk.Label(gf, text="End date:").grid(row=1, column=0, sticky="w", pady=3)
         self._freeze_end_date = tk.StringVar(value="")
         fed_frame = ttk.Frame(gf); fed_frame.grid(row=1, column=1, sticky="w", padx=8)
-        ttk.Entry(fed_frame, textvariable=self._freeze_end_date, width=11).pack(side="left")
+        DatePickerWidget(fed_frame, self._freeze_end_date, allow_empty=True).pack(side="left")
         ttk.Button(fed_frame, text="+", width=2,
                    command=lambda: self._shift_date(self._freeze_end_date, +1)).pack(side="left", padx=(3, 0))
         ttk.Label(gf, text="Time (HH:MM):").grid(row=1, column=2, sticky="w")
         self._freeze_end_time = tk.StringVar(value="")
-        ttk.Entry(gf, textvariable=self._freeze_end_time, width=6).grid(row=1, column=3, sticky="w", padx=8)
+        TimePickerWidget(gf, self._freeze_end_time, allow_empty=True).grid(row=1, column=3, sticky="w", padx=8)
 
-        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=(4, 6))
+        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=6)
 
         # status + buttons
-        bf = ttk.Frame(p); bf.pack(fill="x", pady=(0, 4))
-        self._freeze_status_var = tk.StringVar(value="Freeze Detection inactive")
+        bf = ttk.Frame(p); bf.pack(fill="x")
+        self._freeze_status_var = tk.StringVar(value="AntiFreeze inactive")
         ttk.Label(bf, textvariable=self._freeze_status_var,
                   foreground="#4fc3f7").pack(side="left")
-        self._freeze_stop_btn = ttk.Button(bf, text="■  Stop Freeze Detection",
+        self._freeze_stop_btn = ttk.Button(bf, text="■  Stop AntiFreeze",
                                            command=self.stop_freeze_detection,
                                            state="disabled")
         self._freeze_stop_btn.pack(side="right")
-        self._freeze_start_btn = ttk.Button(bf, text="▶  Start Freeze Detection",
+        self._freeze_start_btn = ttk.Button(bf, text="▶  Start AntiFreeze",
                                             command=self._manual_start_freeze)
         self._freeze_start_btn.pack(side="right", padx=(0, 6))
-        ttk.Button(bf, text="Clear log",
-                   command=self._clear_freeze_log).pack(side="right", padx=(0,6))
 
-        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=(0, 6))
+        ttk.Separator(p, orient="horizontal").pack(fill="x", pady=6)
 
         # log box
         self._freeze_box = scrolledtext.ScrolledText(p, width=58, height=20,
@@ -739,6 +1072,9 @@ class App:
         self._freeze_box.tag_config("WARN",  foreground="darkorange")
         self._freeze_box.tag_config("ERROR", foreground="red")
         self._freeze_box.tag_config("HEAD",  foreground="purple")
+
+        ttk.Button(p, text="Clear log",
+                   command=self._clear_freeze_log).pack(side="right", pady=(4, 0))
 
         # state
         self._freeze_running = False
@@ -787,8 +1123,8 @@ class App:
             self.root.after(0, lambda: self._freeze_end_time.set(end_dt.strftime("%H:%M")))
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="normal"))
         self.root.after(0, lambda: self._freeze_start_btn.config(state="disabled"))
-        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection active…"))
-        self._set_status("Freeze Detection active")
+        self.root.after(0, lambda: self._freeze_status_var.set("AntiFreeze active…"))
+        self._set_status("AntiFreeze active")
         self._freeze_thread = threading.Thread(
             target=self._freeze_loop, args=(end_dt,), daemon=True)
         self._freeze_thread.start()
@@ -797,12 +1133,12 @@ class App:
         self._freeze_running = False
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
         self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
-        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
+        self.root.after(0, lambda: self._freeze_status_var.set("AntiFreeze inactive"))
         self.root.after(0, lambda: self._flog("Freeze Detection stopped.", "WARN"))
         self._set_status("Idle")
 
     def _manual_start_freeze(self):
-        """Start Freeze Detection manually, without going through monitoring."""
+        """Start AntiFreeze manually, without going through monitoring."""
         if self._freeze_running:
             return
         if not self._alive():
@@ -939,7 +1275,7 @@ class App:
         self._freeze_running = False
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
         self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
-        self.root.after(0, lambda: self._freeze_status_var.set("Freeze Detection inactive"))
+        self.root.after(0, lambda: self._freeze_status_var.set("AntiFreeze inactive"))
 
     def _do_freeze_refresh(self, wait_s):
         """Refresh page and wait before next check. If recovery=remonitor, restart click monitoring."""
@@ -961,6 +1297,8 @@ class App:
             self._freeze_sleep(wait_s)
             # check for DAZN "Join live" button after refresh
             self._freeze_try_join_live()
+            # check for profile-chooser avatar after refresh (e.g. DStv)
+            self._freeze_try_profile_select()
 
     def _freeze_try_join_live(self):
         """After freeze refresh, click #joinLive if present (DAZN 'Join live' button)."""
@@ -974,6 +1312,22 @@ class App:
                     "  ▶  'Join live' button found — clicked to rejoin stream.", "OK"))
         except Exception:
             pass  # button not present — video resumed on its own, continue normally
+
+    def _freeze_try_profile_select(self):
+        """After freeze refresh, click profile-chooser avatar if present (e.g. DStv reverts to profile chooser)."""
+        if not self._alive():
+            return
+        xpath = getattr(self, "_freeze_profile_selector", "")
+        if not xpath:
+            return
+        try:
+            el = self.driver.find_element("xpath", xpath)
+            if el and el.is_displayed():
+                el.click()
+                self.root.after(0, lambda: self._flog(
+                    "  ▶  Profile chooser detected — clicked profile avatar to resume.", "OK"))
+        except Exception:
+            pass  # profile chooser not present — video resumed on its own, continue normally
 
     def _freeze_remonitor(self):
         """Restart click monitoring after a freeze. When click succeeds, freeze detection resumes."""
@@ -1308,6 +1662,57 @@ class App:
         self.start_date.set(n.strftime("%Y-%m-%d"))
         self.start_time.set(n.strftime("%H:%M"))
 
+    def _scan_time(self):
+        """Scan the currently open browser page for a date/time and populate start date/time."""
+        if not self.driver:
+            messagebox.showwarning("Scan", "No browser open. Open the browser first.")
+            return
+        try:
+            page_text = self.driver.execute_script("return document.body.innerText;")
+        except Exception as e:
+            messagebox.showerror("Scan", f"Could not read page: {e}")
+            return
+
+        # Try to find YYYY/MM/DD HH:MM format first (e.g. NBA Docomo: 2026/06/24 08:45)
+        dt_found = None
+        m = re.search(r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})\s+(\d{1,2}):(\d{2})', page_text)
+        if m:
+            try:
+                dt_found = datetime.datetime(
+                    int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                    int(m.group(4)), int(m.group(5))
+                )
+            except ValueError:
+                dt_found = None
+
+        # Fallback: plain HH:MM (uses today's date)
+        if dt_found is None:
+            m2 = re.search(r'\b(\d{1,2}):(\d{2})\b', page_text)
+            if m2:
+                try:
+                    now = datetime.datetime.now()
+                    dt_found = now.replace(hour=int(m2.group(1)), minute=int(m2.group(2)),
+                                           second=0, microsecond=0)
+                except ValueError:
+                    dt_found = None
+
+        if dt_found is None:
+            messagebox.showinfo("Scan", "No time found on the current page.")
+            return
+
+        # Apply offset
+        offset_min = getattr(self, "scan_offset_var", None)
+        offset = offset_min.get() if offset_min else 0
+        dt_adjusted = dt_found - datetime.timedelta(minutes=offset)
+
+        self.start_date.set(dt_adjusted.strftime("%Y-%m-%d"))
+        self.start_time.set(dt_adjusted.strftime("%H:%M"))
+        self.log(
+            f"  🔍  Scan: found {dt_found.strftime('%Y-%m-%d %H:%M')} → "
+            f"start set to {dt_adjusted.strftime('%Y-%m-%d %H:%M')} "
+            f"(offset -{offset} min)", "PRECHECK"
+        )
+
     def _platform_changed(self, _event=None):
         name = self.platform_var.get()
         self.url_var.set(PLATFORMS.get(name, ""))
@@ -1353,20 +1758,25 @@ class App:
             self._video_detect_key   = rule.get("video_detect_key", "")
             self._freeze_video_js    = rule.get("freeze_video_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
+            self._freeze_profile_selector = rule.get("freeze_profile_selector", "")
+        # scan offset default per platform
+        scan_off = PLATFORM_RULES.get(name, {}).get("scan_offset", None)
+        if scan_off is not None:
+            self.scan_offset_var.set(scan_off)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo"):
+        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo", "Hotstar"):
             self.browser_size_var.set("MD — 650×550")
         elif name in ("FanCode", "Stan"):
             self.browser_size_var.set("LG — 750×650")
         elif name:
             self.browser_size_var.set("SM — 550×450")
         # freeze detection default per platform
-        if name in ("DAZN DE", "DAZN ES", "DStv",
+        if name in ("DAZN DE", "DAZN ES", "DAZN IT", "DStv",
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
@@ -1995,15 +2405,382 @@ class App:
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         end_str = str(e_dt) if e_dt else "indefinitely"
+        self.root.after(0, lambda: self._monitor_status_var.set("Monitoring active…"))
         self.log(f"Monitoring from {s_dt} → {end_str}", "HEAD")
         self.thread = threading.Thread(target=self._loop,
                                        args=(s_dt, e_dt), daemon=True)
         self.thread.start()
+        # start pre-check thread (fires 2h before s_dt, checks driver is alive)
+        precheck_thread = threading.Thread(target=self._precheck_loop,
+                                           args=(s_dt,), daemon=True)
+        precheck_thread.start()
+
+    # ── Pre-check ─────────────────────────────────────────────────────────────
+
+    def _run_precheck_now(self):
+        """Immediately run the pre-check (browser alive + VPN IP) and alert if failed."""
+        self.root.after(0, lambda: self.log("  🔍  Running pre-check now…", "PRECHECK"))
+        try:
+            result = self.driver.execute_script("return 1;")
+            if result == 1:
+                self.root.after(0, lambda: self.log("  ✅  Browser OK — browser is connected.", "PRECHECK"))
+                self._precheck_ip_info()
+            else:
+                raise RuntimeError(f"Unexpected script result: {result}")
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  🔴  Browser FAILED — browser disconnected: {m}", "ERROR"))
+            self._send_precheck_alert(err)
+
+    def _send_test_mail(self):
+        """Send a test email to verify SMTP configuration."""
+        self.root.after(0, lambda: self.log("  ✉  Sending test mail…", "PRECHECK"))
+        try:
+            body = (
+                f"OTT AutoClicker — test mail.\n\n"
+                f"SMTP konfiguracija radi ispravno.\n"
+                f"Sent: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = "✅ AC - Test mail"
+            msg["From"]    = PRECHECK_MAIL_FROM
+            msg["To"]      = PRECHECK_MAIL_TO
+            with smtplib.SMTP(PRECHECK_SMTP_HOST, PRECHECK_SMTP_PORT, timeout=15) as s:
+                s.starttls()
+                s.login(PRECHECK_SMTP_USER, PRECHECK_SMTP_PASS)
+                s.sendmail(PRECHECK_MAIL_FROM, [PRECHECK_MAIL_TO], msg.as_string())
+            self.root.after(0, lambda: self.log(
+                f"  ✅  Test mail sent to {PRECHECK_MAIL_TO}.", "PRECHECK"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  🔴  Test mail failed: {m}", "ERROR"))
+
+    def _build_alert_html(self, platform_name, start_str, check_str, until_str, error_msg):
+        return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:#c0392b;padding:24px 32px;">
+            <span style="font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">Browser Disconnected</span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:28px 32px 24px 32px;">
+            <p style="margin:0 0 20px 0;font-size:15px;color:#333333;line-height:1.6;">
+              OTT AutoClicker pre-check detected that the browser is <strong>disconnected</strong>.<br>
+              Please reconnect the browser before the scheduled start time.
+            </p>
+            <!-- Info table -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-radius:4px;overflow:hidden;">
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555555;width:170px;">Platform</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{platform_name}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555555;">Check time</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{check_str}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555555;">Monitoring start</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{start_str}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555555;">Until live</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{until_str}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555555;vertical-align:top;">Error</td>
+                <td style="padding:10px 14px;font-size:13px;color:#c0392b;font-family:monospace;word-break:break-all;">{error_msg}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #eeeeee;">
+            <p style="margin:0;font-size:12px;color:#aaaaaa;">OTT AutoClicker &nbsp;·&nbsp; autoclicker@global-mmk.com</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    def _send_precheck_alert(self, error_msg):
+        """Send email notification when pre-check detects browser is disconnected."""
+        platform_name = self.platform_var.get() if hasattr(self, "platform_var") else "?"
+        now = datetime.datetime.now()
+        start_str = self._monitor_start_dt.strftime("%Y-%m-%d %H:%M:%S") if hasattr(self, "_monitor_start_dt") else "?"
+        check_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        if hasattr(self, "_monitor_start_dt"):
+            delta = self._monitor_start_dt - now
+            total_s = max(0, int(delta.total_seconds()))
+            h, rem = divmod(total_s, 3600)
+            m, s   = divmod(rem, 60)
+            until_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
+        else:
+            until_str = "?"
+        if not PRECHECK_SMTP_USER or not PRECHECK_SMTP_PASS or not PRECHECK_MAIL_TO:
+            self.root.after(0, lambda: self.log(
+                "  ⚠  Pre-check alert: mail not configured (set PRECHECK_SMTP_* in code).", "WARN"))
+            return
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"🔴 Browser Disconnected [{platform_name}]"
+            msg["From"]    = PRECHECK_MAIL_FROM
+            msg["To"]      = PRECHECK_MAIL_TO
+            # plain text fallback
+            plain = (
+                f"OTT AutoClicker pre-check FAILED — browser disconnected.\n\n"
+                f"Platform : {platform_name}\n"
+                f"Start time: {start_str}\n"
+                f"Check time: {check_str}\n"
+                f"Error     : {error_msg}\n\n"
+                f"Please reconnect the browser before the scheduled start."
+            )
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(self._build_alert_html(platform_name, start_str, check_str, until_str, error_msg), "html", "utf-8"))
+            with smtplib.SMTP(PRECHECK_SMTP_HOST, PRECHECK_SMTP_PORT, timeout=15) as s:
+                s.starttls()
+                s.login(PRECHECK_SMTP_USER, PRECHECK_SMTP_PASS)
+                s.sendmail(PRECHECK_MAIL_FROM, [PRECHECK_MAIL_TO], msg.as_string())
+            self.root.after(0, lambda: self.log(
+                f"  ✉  Pre-check alert sent to {PRECHECK_MAIL_TO}.", "WARN"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  ✉  Pre-check alert — mail send failed: {m}", "ERROR"))
+
+    def _precheck_ip_info(self):
+        """Fetch IP/location info from inside the browser (reflects proxy/VPN extension).
+        If the platform has a required country in PLATFORM_VPN_COUNTRY, verify the match
+        and send an alert mail if it doesn't match."""
+        import json as _json
+        original_handle = None
+        new_handle = None
+        try:
+            original_handle = self.driver.current_window_handle
+            existing_handles = set(self.driver.window_handles)
+            self.driver.execute_script("window.open('https://ipinfo.io/json');")
+            # find the new handle — whichever wasn't there before
+            import time as _time
+            deadline = _time.time() + 5
+            while _time.time() < deadline:
+                new_handles = set(self.driver.window_handles) - existing_handles
+                if new_handles:
+                    new_handle = new_handles.pop()
+                    break
+                _time.sleep(0.2)
+            if not new_handle:
+                raise RuntimeError("New tab did not open")
+            self.driver.switch_to.window(new_handle)
+            _time.sleep(2)
+            raw = self.driver.find_element("tag name", "pre").text
+            data = _json.loads(raw)
+            ip      = data.get("ip", "?")
+            city    = data.get("city", "?")
+            country = data.get("country", "?")
+            org     = data.get("org", "?")
+            self.root.after(0, lambda i=ip, ci=city, co=country: self.log(
+                f"  ✅  VPN OK — browser IP: {i} | {ci}, {co}", "PRECHECK"))
+            # check required country for this platform
+            platform_name = self.platform_var.get() if hasattr(self, "platform_var") else ""
+            required = PLATFORM_VPN_COUNTRY.get(platform_name)
+            if required:
+                if country.upper() != required.upper():
+                    msg = (f"Expected country {required}, got {country} "
+                           f"(IP: {ip} | {city}, {country})")
+                    self.root.after(0, lambda m=msg: self.log(
+                        f"  🔴  VPN WRONG COUNTRY — {m}", "ERROR"))
+                    self._send_vpn_alert(ip, city, country, org, required)
+                else:
+                    self.root.after(0, lambda co=country, req=required: self.log(
+                        f"  ✅  VPN country OK — {co} matches required {req}", "PRECHECK"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  ⚠  VPN check failed: {m}", "WARN"))
+        finally:
+            try:
+                if new_handle and new_handle in self.driver.window_handles:
+                    self.driver.switch_to.window(new_handle)
+                    self.driver.close()
+                if original_handle and original_handle in self.driver.window_handles:
+                    self.driver.switch_to.window(original_handle)
+            except Exception:
+                pass
+
+    def _send_vpn_alert(self, ip, city, country, org, required):
+        """Send email alert when browser IP country doesn't match the required country."""
+        platform_name = self.platform_var.get() if hasattr(self, "platform_var") else "?"
+        start_str = self._monitor_start_dt.strftime("%Y-%m-%d %H:%M:%S") if hasattr(self, "_monitor_start_dt") else "?"
+        check_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if hasattr(self, "_monitor_start_dt"):
+            delta = self._monitor_start_dt - datetime.datetime.now()
+            total_s = max(0, int(delta.total_seconds()))
+            h, rem = divmod(total_s, 3600)
+            m, s   = divmod(rem, 60)
+            until_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
+        else:
+            until_str = "?"
+        if not PRECHECK_SMTP_USER or not PRECHECK_SMTP_PASS or not PRECHECK_MAIL_TO:
+            return
+        try:
+            html = self._build_vpn_alert_html(
+                platform_name, check_str, start_str, until_str,
+                ip, city, country, org, required)
+            plain = (
+                f"OTT AutoClicker VPN pre-check FAILED — wrong country.\n\n"
+                f"Platform : {platform_name}\n"
+                f"Required : {required}\n"
+                f"Got      : {country} (IP: {ip} | {city})\n"
+                f"ISP/VPN  : {org}\n"
+                f"Check    : {check_str}\n"
+                f"Start    : {start_str}\n"
+                f"Until    : {until_str}\n\n"
+                f"Please reconnect VPN to {required} before the scheduled start."
+            )
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"🔴 VPN Wrong Country [{platform_name}]"
+            msg["From"]    = PRECHECK_MAIL_FROM
+            msg["To"]      = PRECHECK_MAIL_TO
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(html, "html", "utf-8"))
+            with smtplib.SMTP(PRECHECK_SMTP_HOST, PRECHECK_SMTP_PORT, timeout=15) as s:
+                s.starttls()
+                s.login(PRECHECK_SMTP_USER, PRECHECK_SMTP_PASS)
+                s.sendmail(PRECHECK_MAIL_FROM, [PRECHECK_MAIL_TO], msg.as_string())
+            self.root.after(0, lambda: self.log(
+                f"  ✉  VPN alert sent to {PRECHECK_MAIL_TO}.", "WARN"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  ✉  VPN alert — mail send failed: {m}", "ERROR"))
+
+    def _build_vpn_alert_html(self, platform_name, check_str, start_str, until_str,
+                               ip, city, country, org, required):
+        return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:#b7860b;padding:24px 32px;">
+            <span style="font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">VPN Wrong Country</span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:28px 32px 24px 32px;">
+            <p style="margin:0 0 20px 0;font-size:15px;color:#333333;line-height:1.6;">
+              OTT AutoClicker pre-check detected that the browser IP is in the <strong>wrong country</strong>. Please reconnect VPN to <strong>{required}</strong> before the scheduled start time.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-radius:4px;overflow:hidden;">
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;width:170px;">Platform</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{platform_name}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Check time</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{check_str}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Monitoring start</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{start_str}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Until live</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{until_str}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Required country</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{required}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Detected country</td>
+                <td style="padding:10px 14px;font-size:14px;color:#c0392b;font-weight:bold;">{country}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #b7860b;font-size:13px;color:#555555;">Browser IP</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{ip} &nbsp;·&nbsp; {city}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #eeeeee;">
+            <p style="margin:0;font-size:12px;color:#aaaaaa;">OTT AutoClicker &nbsp;·&nbsp; autoclicker@global-mmk.com</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    def _precheck_loop(self, s_dt):
+        """Determine check time based on start time, then verify browser is alive.
+        - 00:00–04:59 (night): check at 23:00 the previous evening
+        - 05:00–23:59 (day):   check 2 hours before start
+        """
+        now = datetime.datetime.now()
+        if s_dt.hour < 5:
+            # night start — check at 23:00 the previous day
+            prev_day = s_dt.date() - datetime.timedelta(days=1)
+            check_dt = datetime.datetime.combine(prev_day, datetime.time(23, 0))
+            label = "23:00 (night check, evening before)"
+        else:
+            # day start — check 2 hours before
+            check_dt = s_dt - datetime.timedelta(hours=2)
+            label = f"{check_dt.strftime('%H:%M')} (2h before start)"
+        if check_dt <= now:
+            # check time already passed — skip
+            return
+        # sleep until check time
+        wait_s = (check_dt - now).total_seconds()
+        self.root.after(0, lambda t=label: self.log(
+            f"  🔍  Pre-check scheduled at {t}.", "PRECHECK"))
+        # interruptible sleep
+        deadline = time.time() + wait_s
+        while time.time() < deadline:
+            if not self.running:
+                return  # monitoring was stopped, cancel pre-check
+            time.sleep(5)
+        if not self.running:
+            return
+        # perform the check
+        self.root.after(0, lambda: self.log("  🔍  Running pre-check…", "PRECHECK"))
+        try:
+            result = self.driver.execute_script("return 1;")
+            if result == 1:
+                self.root.after(0, lambda: self.log("  ✅  Browser OK — browser is connected.", "PRECHECK"))
+                self._precheck_ip_info()
+            else:
+                raise RuntimeError(f"Unexpected script result: {result}")
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  🔴  Browser FAILED — browser disconnected: {m}", "ERROR"))
+            self._send_precheck_alert(err)
 
     def stop_monitoring(self, trigger_freeze=False):
         self.running = False
         self.root.after(0, lambda: self.start_btn.config(state="normal"))
         self.root.after(0, lambda: self.stop_btn.config(state="disabled"))
+        self.root.after(0, lambda: self._monitor_status_var.set("Monitoring inactive"))
         self.log("Monitoring stopped.", "WARN"); self._set_status("Stopped")
         if trigger_freeze and self.freeze_detect_var.get():
             # keep original end time if freeze was already running (remonitor case)
