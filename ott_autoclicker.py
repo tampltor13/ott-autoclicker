@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.87"
+VERSION = "1.0.88"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -1725,28 +1725,65 @@ class App:
         platform = self.platform_var.get()
         is_prime = platform.startswith("Prime Video")
 
-        # 1. Amazon/human format: "Jun 28, 2026 3:00 AM CEST" — only for Prime Video
+        MONTHS = {
+            "Jan":1,"January":1,"Feb":2,"February":2,"Mar":3,"March":3,
+            "Apr":4,"April":4,"May":5,"Jun":6,"June":6,
+            "Jul":7,"July":7,"Aug":8,"August":8,"Sep":9,"September":9,
+            "Oct":10,"October":10,"Nov":11,"November":11,"Dec":12,"December":12,
+        }
+
+        def _parse_amazon(text):
+            m = re.search(
+                r'(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
+                r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)'
+                r'\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)',
+                text, re.IGNORECASE)
+            if not m:
+                return None
+            try:
+                mon  = MONTHS.get(m.group(1).capitalize()) or MONTHS.get(m.group(1)[:3].capitalize())
+                day  = int(m.group(2))
+                year = int(m.group(3))
+                hour = int(m.group(4))
+                mins = int(m.group(5))
+                ampm = m.group(6).upper()
+                if ampm == "PM" and hour != 12:
+                    hour += 12
+                elif ampm == "AM" and hour == 12:
+                    hour = 0
+                return datetime.datetime(year, mon, day, hour, mins)
+            except ValueError:
+                return None
+
         if is_prime:
-            MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
-                      "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
-            m1 = re.search(
-                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)',
-                page_text, re.IGNORECASE)
-            if m1:
-                try:
-                    mon  = MONTHS[m1.group(1).capitalize()]
-                    day  = int(m1.group(2))
-                    year = int(m1.group(3))
-                    hour = int(m1.group(4))
-                    mins = int(m1.group(5))
-                    ampm = m1.group(6).upper()
-                    if ampm == "PM" and hour != 12:
-                        hour += 12
-                    elif ampm == "AM" and hour == 12:
-                        hour = 0
-                    dt_found = datetime.datetime(year, mon, day, hour, mins)
-                except ValueError:
-                    dt_found = None
+            # For Prime Video: wait for buy-box-msg to render, then read ONLY that element.
+            # Never fall back to full page — page is full of other dates/timestamps.
+            def _read_buy_box(d):
+                t = d.execute_script("""
+                    var el = document.querySelector('[data-testid="buy-box-msg"]');
+                    if (!el) return null;
+                    return (el.innerText || el.textContent || '').replace(/ /g, ' ').trim();
+                """)
+                return t if t else None
+
+            try:
+                prime_text = WebDriverWait(self.driver, 10).until(_read_buy_box)
+                self.log(f"  🔍  Scan [buy-box-msg]: {repr(prime_text[:80]) if prime_text else 'None'}", "PRECHECK")
+                dt_found = _parse_amazon(prime_text) if prime_text else None
+            except Exception as e:
+                prime_text = None
+                self.log(f"  🔍  Scan [buy-box-msg] timeout/error: {e}", "PRECHECK")
+
+            if dt_found is None:
+                # Last resort: try current page_text (already read at top) with Amazon regex only
+                dt_found = _parse_amazon(page_text)
+                if dt_found:
+                    self.log(f"  🔍  Scan [body fallback]: {repr(page_text[:80])}", "PRECHECK")
+
+            if dt_found is None:
+                messagebox.showinfo("Scan", "No Amazon date/time found on page.\n"
+                                            "Make sure you're on the event page with the 'Watch Live' button visible.")
+                return
 
         # 2. YYYY/MM/DD HH:MM or YYYY-MM-DD HH:MM (e.g. NBA Docomo: 2026/06/24 08:45)
         if dt_found is None:
