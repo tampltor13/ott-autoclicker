@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.85"
+VERSION = "1.0.86"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -84,6 +84,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video IT": {
         "selector":        "XPath",
@@ -91,6 +92,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video BR": {
         "selector":        "XPath",
@@ -98,6 +100,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video UK": {
         "selector":        "XPath",
@@ -105,6 +108,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video DE": {
         "selector":        "XPath",
@@ -112,6 +116,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video ES": {
         "selector":        "XPath",
@@ -119,6 +124,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video JP": {
         "selector":        "XPath",
@@ -126,6 +132,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video MX": {
         "selector":        "XPath",
@@ -133,6 +140,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Prime Video FR": {
         "selector":        "XPath",
@@ -140,6 +148,7 @@ PLATFORM_RULES = {
         "refresh_first":   True,
         "click_delay":     2,
         "freeze_recovery": "remonitor",
+        "scan_offset":     30,
     },
     "Peacock": {
         "selector":      "XPath",
@@ -737,8 +746,26 @@ class App:
 
     # ── SETUP TAB ────────────────────────────────────────────────────────────
     def _setup_tab(self, parent):
-        p = ttk.Frame(parent, padding=12)
-        p.pack(fill="both", expand=True)
+        # Scrollable container so Advanced mode content isn't clipped
+        _canvas = tk.Canvas(parent, highlightthickness=0)
+        _vsb = ttk.Scrollbar(parent, orient="vertical", command=_canvas.yview)
+        _canvas.configure(yscrollcommand=_vsb.set)
+        _vsb.pack(side="right", fill="y")
+        _canvas.pack(side="left", fill="both", expand=True)
+
+        p = ttk.Frame(_canvas, padding=12)
+        _cwin = _canvas.create_window((0, 0), window=p, anchor="nw")
+
+        def _on_frame_configure(e):
+            _canvas.configure(scrollregion=_canvas.bbox("all"))
+        def _on_canvas_configure(e):
+            _canvas.itemconfig(_cwin, width=e.width)
+        def _on_mousewheel(e):
+            _canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        p.bind("<Configure>", _on_frame_configure)
+        _canvas.bind("<Configure>", _on_canvas_configure)
+        _canvas.bind("<MouseWheel>", _on_mousewheel)
+        p.bind_all("<MouseWheel>", _on_mousewheel)
 
         r = 0
         # IP address display
@@ -749,9 +776,6 @@ class App:
         ttk.Button(ip_frame, text="↺", width=2,
                    command=lambda: threading.Thread(target=self._fetch_ip, daemon=True).start()
                    ).pack(side="left", padx=(6, 0))
-        ttk.Button(ip_frame, text="Run precheck", width=13,
-                   command=lambda: threading.Thread(target=self._run_precheck_now, daemon=True).start()
-                   ).pack(side="left", padx=(12, 0))
         r += 1
         # browser radio buttons
         ttk.Label(p, text="Browser:").grid(row=r, column=0, sticky="w", pady=3)
@@ -1002,7 +1026,7 @@ class App:
         self.end_time = tk.StringVar(value="")
         TimePickerWidget(et_frame, self.end_time, allow_empty=True).pack(side="left")
         ttk.Button(et_frame, text="Scan", width=6,
-                   command=self._scan_time).pack(side="left", padx=(6, 0))
+                   command=self._scan_time).pack(side="left", padx=(4, 0))
 
         ttk.Separator(p, orient="horizontal").grid(
             row=r, column=0, columnspan=4, sticky="ew", pady=6); r += 1
