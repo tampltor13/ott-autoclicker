@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.86"
+VERSION = "1.0.87"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -790,7 +790,8 @@ class App:
         cb = ttk.Combobox(p, textvariable=self.platform_var,
                           values=list(PLATFORMS.keys()), state="readonly", width=22, height=20)
         cb.grid(row=r, column=1, columnspan=3, sticky="w", padx=8)
-        cb.bind("<<ComboboxSelected>>", self._platform_changed); r += 1
+        cb.bind("<<ComboboxSelected>>", self._platform_changed)
+        cb.bind("<MouseWheel>", lambda e: "break"); r += 1
 
         # url
         ttk.Label(p, text="URL:").grid(row=r, column=0, sticky="w", pady=3)
@@ -805,6 +806,7 @@ class App:
                      values=["SM — 550×450", "MD — 650×550", "LG — 750×650"],
                      state="readonly", width=16)
         _cbs.grid(row=r, column=1, sticky="w", padx=8)
+        _cbs.bind("<MouseWheel>", lambda e: "break")
         self.browser_size_var.trace_add("write", self._on_browser_size_changed)
         self._adv_widgets = [(_lbs, "grid"), (_cbs, "grid")]
         r += 1
@@ -1720,38 +1722,41 @@ class App:
             return
 
         dt_found = None
+        platform = self.platform_var.get()
+        is_prime = platform.startswith("Prime Video")
 
-        # 1. YYYY/MM/DD HH:MM or YYYY-MM-DD HH:MM (e.g. NBA Docomo: 2026/06/24 08:45)
-        m = re.search(r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})\s+(\d{1,2}):(\d{2})', page_text)
-        if m:
-            try:
-                dt_found = datetime.datetime(
-                    int(m.group(1)), int(m.group(2)), int(m.group(3)),
-                    int(m.group(4)), int(m.group(5))
-                )
-            except ValueError:
-                dt_found = None
-
-        # 2. Amazon format: "Jun 26, 2026 12:30 AM" / "Jun 26, 2026 12:30 AM CEST"
-        if dt_found is None:
+        # 1. Amazon/human format: "Jun 28, 2026 3:00 AM CEST" — only for Prime Video
+        if is_prime:
             MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
                       "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
-            m2 = re.search(
+            m1 = re.search(
                 r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)',
                 page_text, re.IGNORECASE)
-            if m2:
+            if m1:
                 try:
-                    mon  = MONTHS[m2.group(1).capitalize()]
-                    day  = int(m2.group(2))
-                    year = int(m2.group(3))
-                    hour = int(m2.group(4))
-                    mins = int(m2.group(5))
-                    ampm = m2.group(6).upper()
+                    mon  = MONTHS[m1.group(1).capitalize()]
+                    day  = int(m1.group(2))
+                    year = int(m1.group(3))
+                    hour = int(m1.group(4))
+                    mins = int(m1.group(5))
+                    ampm = m1.group(6).upper()
                     if ampm == "PM" and hour != 12:
                         hour += 12
                     elif ampm == "AM" and hour == 12:
                         hour = 0
                     dt_found = datetime.datetime(year, mon, day, hour, mins)
+                except ValueError:
+                    dt_found = None
+
+        # 2. YYYY/MM/DD HH:MM or YYYY-MM-DD HH:MM (e.g. NBA Docomo: 2026/06/24 08:45)
+        if dt_found is None:
+            m2 = re.search(r'(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})\s+(\d{1,2}):(\d{2})', page_text)
+            if m2:
+                try:
+                    dt_found = datetime.datetime(
+                        int(m2.group(1)), int(m2.group(2)), int(m2.group(3)),
+                        int(m2.group(4)), int(m2.group(5))
+                    )
                 except ValueError:
                     dt_found = None
 
