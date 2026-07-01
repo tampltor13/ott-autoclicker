@@ -2,6 +2,67 @@ OTT AutoClicker — Changelog
 ===========================
 
 
+v1.0.92 — WOWOW: "ライブを再生" dialog handling + generički freeze_live_selector
+-----------------------------------------------------------------------
+- Novi mehanizam freeze_live_selector: generički XPath klik nakon refresha
+  Poziva se i u video_detect loopu (prvo učitavanje) i u freeze recovery loopu
+  Silent no-op ako element nije prisutan — neće smetati ostalim platformama
+- WOWOW: freeze_live_selector = '//a[contains(@class,"btn-fill") and contains(.,"ライブを再生")]'
+  Klikne "ライブを再生" (Play Live) gumb u resume dijalogu ako se pojavi
+
+v1.0.91 — Disney+ preimenovan u Disney+ US + channels.csv
+-----------------------------------------------------------------------
+- Platforma "Disney+" preimenovana u "Disney+ US" (PLATFORMS + PLATFORM_RULES)
+- channels.csv: dodan redak USA / Disney+ US / C30OTT / Chrome
+
+v1.0.90 — Nova platforma: WOWOW
+-----------------------------------------------------------------------
+- Dodana platforma WOWOW (https://wod.wowow.co.jp/live-schedule)
+- Mod: video_detect (refresh_first) — identično kao DAZN, video kreće automatski nakon refresha
+- Default browser: Edge
+- Default freeze detection: ON, freeze_recovery: refresh_only
+- Default scan_offset: 30 min (video dostupan 30 min prije live eventa)
+
+v1.0.89 — Stan: Scan podrška + default offset 30 min
+-----------------------------------------------------------------------
+- Scan: dodan _parse_stan() parser za Stan format "3:00pm 29 June 2026"
+  Čita direktno iz section.program__details-extended .program__extra via JS
+  Fallback na cijeli page_text ako JS element nije dostupan
+  Stan scan ne pada na generalne YYYY/MM/DD ili HH:MM fallback parsere
+- Stan default scan_offset: 30 min (kao Prime Video)
+
+v1.0.88 — Scan: Prime Video fix — puna imena mjeseci + WebDriverWait
+-----------------------------------------------------------------------
+- Amazon regex prihvaća puna imena mjeseci: June, July, August... (ne samo Jun, Jul, Aug)
+- WebDriverWait(10s) čeka da se buy-box-msg element renderira prije čitanja
+  (querySelector bez waita vraćao null jer element još nije bio u DOM-u)
+- Za Prime Video nikad ne pada na YYYY/MM/DD regex (page ima misleading timestampove)
+- Debug log ispisuje što je pročitano iz buy-box-msg
+
+v1.0.87 — Scan: Amazon format samo za Prime Video + Setup tab scroll + UI fixes
+-----------------------------------------------------------------------
+- Scan: Amazon "Jun 28, 2026 3:00 AM CEST" format se primjenjuje SAMO za Prime Video platforme
+  Za ostale platforme redosljed ostaje: YYYY/MM/DD → plain HH:MM
+  Sprječava krivi match datuma na non-Prime stranicama
+- Setup tab: scrollable canvas — Advanced mode sadržaj više nije odsječen
+  Scroll wheel radi unutar Setup taba
+- Combobox (Platform, Browser size): scroll wheel više ne mijenja vrijednost
+- Scan gumb: padx poravnan s Now gumbom (4px umjesto 6px)
+
+v1.0.86 — Scan offset: sve Prime Video platforme default 30 min
+-----------------------------------------------------------------------
+- Sve Prime Video platforme (USA/IT/BR/UK/DE/ES/JP/MX/FR) dobivaju scan_offset: 30
+  Scan skida 30 min — npr. utakmica 00:30 → start monitoring 00:00 (ispravno, isti dan)
+  Bez ovog, default 60 min bi dao 23:30 prethodne noći → night-check logika (23:00 prethodnog dana)
+
+v1.0.85 — Scan: Amazon format + SMTP credentials iz lokalnog fajla
+-----------------------------------------------------------------------
+- Scan button: dodан Amazon format "Jun 26, 2026 12:30 AM CEST" s AM/PM konverzijom
+  Redosljed pretrage: YYYY/MM/DD → Amazon MMM DD YYYY HH:MM AM/PM → plain HH:MM
+- SMTP credentials premješteni iz koda u lokalni smtp_config.txt
+  (KEY=VALUE format, nije u git repozitoriju)
+- .gitignore dodan: smtp_config.txt, browser_profiles/, logs.txt
+
 v1.0.84 — Pre-check: pametno vrijeme provjere + VPN country check + HTML mailovi
 -----------------------------------------------------------------------
 - Pre-check logika: 00:00–04:59 → check u 23:00 prethodne večeri
