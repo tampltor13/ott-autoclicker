@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.88"
+VERSION = "1.0.92"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -65,7 +65,7 @@ PLATFORMS = {
     "NBA Docomo":  "https://nba.docomo.ne.jp/schedule",
     "Paramount+":  "https://www.paramountplus.com",
     "TOD":         "https://www.tod.tv",
-    "Disney+":     "https://www.disneyplus.com/home",
+    "Disney+ US":  "https://www.disneyplus.com/home",
     "Disney+ SE":  "https://www.disneyplus.com/home",
     "Disney+ DK":  "https://www.disneyplus.com/home",
     "Disney+ AR":  "https://www.disneyplus.com/en-gb/home",
@@ -73,6 +73,7 @@ PLATFORMS = {
     "FanCode":    "https://www.fancode.com",
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
     "Stan":       "https://play.stan.com.au/sport",
+    "WOWOW":      "https://wod.wowow.co.jp/live-schedule",
     "Fubo":       "https://www.fubo.tv/",
     "Hotstar":    "https://www.hotstar.com/in/home",
 }
@@ -195,7 +196,7 @@ PLATFORM_RULES = {
         "refresh_first": True,
         "click_delay":   2,
     },
-    "Disney+": {
+    "Disney+ US": {
         "selector":      "XPath",
         "targets":       '//*[@data-testid="modal-action-button"]\n//*[@data-testid="playback-action-button"]\n//*[@data-testid="live-modal-watch-live-action-button"]',
         "refresh_first": True,
@@ -288,6 +289,7 @@ PLATFORM_RULES = {
         "force_js_click":  True,
         "dispatch_click":  True,
         "freeze_video_js": "const p = document.querySelector('stan-player'); const v = p && p.shadowRoot && p.shadowRoot.querySelector('video'); return v ? v.currentTime : null;",
+        "scan_offset":     15,
     },
     "FanCode": {
         "selector":        "XPath",
@@ -298,6 +300,15 @@ PLATFORM_RULES = {
         "video_detect_js": "const v = document.querySelector('video'); return !!(v && !v.error && v.currentTime > 0 && v.readyState >= 3);",
         "video_detect_key": "m",
         "freeze_recovery": "refresh_only",
+    },
+    "WOWOW": {
+        "video_detect":       True,
+        "video_detect_js":    "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":      True,
+        "load_wait":          60,
+        "freeze_recovery":    "refresh_only",
+        "freeze_live_selector": '//a[contains(@class,"btn-fill") and contains(.,"ライブを再生")]',
+        "scan_offset":        30,
     },
 }
 SELECTOR_LABELS = ["Class Name", "CSS Selector", "ID", "XPath"]
@@ -883,6 +894,7 @@ class App:
         self._freeze_video_js    = ""
         self._freeze_recovery    = "refresh_only"
         self._freeze_profile_selector = ""
+        self._freeze_live_selector    = ""
         r += 1
 
         # selector type
@@ -1347,6 +1359,8 @@ class App:
             self._freeze_try_join_live()
             # check for profile-chooser avatar after refresh (e.g. DStv)
             self._freeze_try_profile_select()
+            # check for platform-specific "Play Live" dialog after refresh (e.g. WOWOW)
+            self._try_live_selector()
 
     def _freeze_try_join_live(self):
         """After freeze refresh, click #joinLive if present (DAZN 'Join live' button)."""
@@ -1376,6 +1390,23 @@ class App:
                     "  ▶  Profile chooser detected — clicked profile avatar to resume.", "OK"))
         except Exception:
             pass  # profile chooser not present — video resumed on its own, continue normally
+
+    def _try_live_selector(self):
+        """After refresh, click a platform-specific 'Play Live' button if present (e.g. WOWOW resume dialog).
+        Uses freeze_live_selector XPath from PLATFORM_RULES. Silent no-op if element not found."""
+        if not self._alive():
+            return
+        xpath = getattr(self, "_freeze_live_selector", "")
+        if not xpath:
+            return
+        try:
+            el = self.driver.find_element("xpath", xpath)
+            if el and el.is_displayed():
+                el.click()
+                self.root.after(0, lambda: self._flog(
+                    "  ▶  'Play Live' dialog detected — clicked to start live stream.", "OK"))
+        except Exception:
+            pass  # dialog not present — video resumed on its own, continue normally
 
     def _freeze_remonitor(self):
         """Restart click monitoring after a freeze. When click succeeds, freeze detection resumes."""
@@ -1733,27 +1764,67 @@ class App:
         }
 
         def _parse_amazon(text):
+            # Format 1: full date — "June 28, 2026 3:00 AM CEST" or "29 Jun 2026 3:10 PM CEST"
             m = re.search(
                 r'(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
                 r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)'
                 r'\s+(\d{1,2}),?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)',
                 text, re.IGNORECASE)
-            if not m:
-                return None
-            try:
-                mon  = MONTHS.get(m.group(1).capitalize()) or MONTHS.get(m.group(1)[:3].capitalize())
-                day  = int(m.group(2))
-                year = int(m.group(3))
-                hour = int(m.group(4))
-                mins = int(m.group(5))
-                ampm = m.group(6).upper()
-                if ampm == "PM" and hour != 12:
-                    hour += 12
-                elif ampm == "AM" and hour == 12:
-                    hour = 0
-                return datetime.datetime(year, mon, day, hour, mins)
-            except ValueError:
-                return None
+            if m:
+                try:
+                    mon  = MONTHS.get(m.group(1).capitalize()) or MONTHS.get(m.group(1)[:3].capitalize())
+                    day  = int(m.group(2))
+                    year = int(m.group(3))
+                    hour = int(m.group(4))
+                    mins = int(m.group(5))
+                    ampm = m.group(6).upper()
+                    if ampm == "PM" and hour != 12:
+                        hour += 12
+                    elif ampm == "AM" and hour == 12:
+                        hour = 0
+                    return datetime.datetime(year, mon, day, hour, mins)
+                except ValueError:
+                    pass
+
+            # Format 2: time only — "Watch Live: 15:10 CEST" (event is today, no date shown)
+            m2 = re.search(r'\b(\d{1,2}):(\d{2})\s*(?:CEST|CET|UTC|GMT|EST|PST|BST)?\b', text)
+            if m2:
+                try:
+                    now = datetime.datetime.now()
+                    return now.replace(hour=int(m2.group(1)), minute=int(m2.group(2)),
+                                       second=0, microsecond=0)
+                except ValueError:
+                    pass
+
+            return None
+
+        def _parse_stan(text):
+            # Stan format: "3:00pm 29 June 2026" or "11:30am 1 July 2026"
+            # Extracted from <section class="program__details-extended"> → first program__extra div
+            m = re.search(
+                r'\b(\d{1,2}):(\d{2})(am|pm)\s+(\d{1,2})\s+'
+                r'(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
+                r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)'
+                r'\s+(\d{4})',
+                text, re.IGNORECASE)
+            if m:
+                try:
+                    hour = int(m.group(1))
+                    mins = int(m.group(2))
+                    ampm = m.group(3).lower()
+                    day  = int(m.group(4))
+                    mon  = MONTHS.get(m.group(5).capitalize()) or MONTHS.get(m.group(5)[:3].capitalize())
+                    year = int(m.group(6))
+                    if ampm == "pm" and hour != 12:
+                        hour += 12
+                    elif ampm == "am" and hour == 12:
+                        hour = 0
+                    return datetime.datetime(year, mon, day, hour, mins)
+                except ValueError:
+                    pass
+            return None
+
+        is_stan = (platform == "Stan")
 
         if is_prime:
             # For Prime Video: wait for buy-box-msg to render, then read ONLY that element.
@@ -1783,6 +1854,27 @@ class App:
             if dt_found is None:
                 messagebox.showinfo("Scan", "No Amazon date/time found on page.\n"
                                             "Make sure you're on the event page with the 'Watch Live' button visible.")
+                return
+
+        # 1b. Stan — "3:00pm 29 June 2026" from program__details-extended
+        if is_stan and dt_found is None:
+            try:
+                stan_text = self.driver.execute_script("""
+                    var el = document.querySelector('section.program__details-extended .program__extra');
+                    return el ? (el.innerText || el.textContent || '').trim() : null;
+                """)
+                self.log(f"  🔍  Scan [Stan program__extra]: {repr(stan_text[:80]) if stan_text else 'None'}", "PRECHECK")
+                dt_found = _parse_stan(stan_text) if stan_text else None
+            except Exception as e:
+                self.log(f"  🔍  Scan [Stan] error: {e}", "PRECHECK")
+
+            if dt_found is None:
+                # Fallback: try full page text with Stan parser
+                dt_found = _parse_stan(page_text)
+
+            if dt_found is None:
+                messagebox.showinfo("Scan", "No Stan date/time found on page.\n"
+                                            "Make sure you're on the event page showing the start time.")
                 return
 
         # 2. YYYY/MM/DD HH:MM or YYYY-MM-DD HH:MM (e.g. NBA Docomo: 2026/06/24 08:45)
@@ -1871,12 +1963,13 @@ class App:
             self._freeze_video_js    = rule.get("freeze_video_js", "")
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
             self._freeze_profile_selector = rule.get("freeze_profile_selector", "")
+            self._freeze_live_selector    = rule.get("freeze_live_selector", "")
         # scan offset default per platform
         scan_off = PLATFORM_RULES.get(name, {}).get("scan_offset", None)
         if scan_off is not None:
             self.scan_offset_var.set(scan_off)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -1892,7 +1985,7 @@ class App:
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
-                    "Disney+ AR", "FanCode", "Stan"):
+                    "Disney+ AR", "FanCode", "Stan", "WOWOW"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -2973,6 +3066,8 @@ class App:
                     self.root.after(0, lambda s=load_s:
                         self.log(f"  ⏱  page-load wait {s}s…"))
                     if not self._sleep(load_s): break
+                # click "Play Live" dialog if present (e.g. WOWOW resume dialog)
+                self._try_live_selector()
                 js = self._video_detect_js
                 playing = False
                 try:
