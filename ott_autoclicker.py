@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.92"
+VERSION = "1.0.99"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -74,6 +74,7 @@ PLATFORMS = {
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
     "Stan":       "https://play.stan.com.au/sport",
     "WOWOW":      "https://wod.wowow.co.jp/live-schedule",
+    "ESPN+ US":   "https://www.espn.com/watch/schedule",
     "Fubo":       "https://www.fubo.tv/",
     "Hotstar":    "https://www.hotstar.com/in/home",
 }
@@ -301,6 +302,15 @@ PLATFORM_RULES = {
         "video_detect_key": "m",
         "freeze_recovery": "refresh_only",
     },
+    "ESPN+ US": {
+        "video_detect":      True,
+        "video_detect_js":   "return Array.from(document.querySelectorAll('video')).some(v => v.currentTime > 1 && !v.error);",
+        "video_detect_key":  "m",
+        "refresh_first":     True,
+        "load_wait":         15,
+        "freeze_recovery":   "refresh_only",
+        "scan_offset":       10,
+    },
     "WOWOW": {
         "video_detect":       True,
         "video_detect_js":    "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
@@ -356,6 +366,8 @@ _load_smtp_config()
 # If platform is in this dict, pre-check will verify browser IP matches country.
 PLATFORM_VPN_COUNTRY = {
     "Prime Video USA": "US",
+    "ESPN+ US":        "US",
+    "Peacock":         "US",
     "Prime Video IT":  "IT",
     "Prime Video BR":  "BR",
     "Prime Video UK":  "GB",
@@ -1094,8 +1106,7 @@ class App:
         fst_frame = ttk.Frame(gf); fst_frame.grid(row=0, column=3, sticky="w", padx=8)
         TimePickerWidget(fst_frame, self._freeze_start_time).pack(side="left")
         ttk.Button(fst_frame, text="Now", width=6,
-                   command=lambda: self._freeze_start_time.set(
-                       datetime.datetime.now().strftime("%H:%M"))).pack(side="left", padx=(4, 0))
+                   command=self._set_freeze_start_now).pack(side="left", padx=(4, 0))
 
         ttk.Label(gf, text="End date:").grid(row=1, column=0, sticky="w", pady=3)
         self._freeze_end_date = tk.StringVar(value="")
@@ -1258,6 +1269,25 @@ class App:
                 self.root.after(0, self.stop_freeze_detection)
                 break
 
+            # check for browser crash/error page (OOM, net error, etc.)
+            try:
+                cur_url = self.driver.current_url or ""
+                if cur_url.startswith(("chrome-error://", "edge://crashedtab",
+                                       "about:neterror", "chrome://crashedtab")):
+                    self.root.after(0, lambda u=cur_url: self._flog(
+                        f"  ⚠  Browser crash page detected — navigating back to platform URL…", "WARN"))
+                    plat_url = PLATFORMS.get(getattr(self, "_current_platform", ""), "")
+                    if plat_url:
+                        try:
+                            self.driver.get(plat_url)
+                        except Exception:
+                            pass
+                    self._do_freeze_refresh(REFRESH_WAIT)
+                    prev_time = None
+                    continue
+            except Exception:
+                pass
+
             # sample currentTime
             current_time = None
             try:
@@ -1271,7 +1301,26 @@ class App:
                         "return v ? v.currentTime : null;")
             except Exception as e:
                 err = str(e)
-                self.root.after(0, lambda m=err: self._flog(f"JS error: {m}", "ERROR"))
+                # check if tab crashed (OOM etc.) — URL may now be an error page
+                try:
+                    crash_url = self.driver.current_url or ""
+                    if any(crash_url.startswith(p) for p in (
+                            "chrome-error://", "edge://crashedtab",
+                            "about:neterror", "chrome://crashedtab")):
+                        self.root.after(0, lambda: self._flog(
+                            "  ⚠  Browser tab crashed (Out of Memory?) — navigating back to platform URL…", "WARN"))
+                        plat_url = PLATFORMS.get(getattr(self, "_current_platform", ""), "")
+                        if plat_url:
+                            try:
+                                self.driver.get(plat_url)
+                            except Exception:
+                                pass
+                        self._do_freeze_refresh(REFRESH_WAIT)
+                        prev_time = None
+                        continue
+                except Exception:
+                    pass
+                self.root.after(0, lambda m=err: self._flog(f"  JS error: {m}", "ERROR"))
 
             if current_time is None:
                 self.root.after(0, lambda: self._flog(
@@ -1741,6 +1790,11 @@ class App:
         self.start_date.set(n.strftime("%Y-%m-%d"))
         self.start_time.set(n.strftime("%H:%M"))
 
+    def _set_freeze_start_now(self):
+        n = datetime.datetime.now()
+        self._freeze_start_date.set(n.strftime("%Y-%m-%d"))
+        self._freeze_start_time.set(n.strftime("%H:%M"))
+
     def _scan_time(self):
         """Scan the currently open browser page for a date/time and populate start date/time."""
         if not self.driver:
@@ -1824,7 +1878,36 @@ class App:
                     pass
             return None
 
-        is_stan = (platform == "Stan")
+        def _parse_espn(text):
+            # ESPN+ format: "Monday, July 6 | 7:30 PM"
+            # Extracted from <p class="WatchPaywall__subtitle">
+            # ESPN+ shows times in the PC's local timezone (detected from browser locale),
+            # so no conversion needed — use as-is.
+            m = re.search(
+                r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+'
+                r'(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
+                r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)'
+                r'\s+(\d{1,2})\s*\|\s*(\d{1,2}):(\d{2})\s*(AM|PM)',
+                text, re.IGNORECASE)
+            if m:
+                try:
+                    mon  = MONTHS.get(m.group(1).capitalize()) or MONTHS.get(m.group(1)[:3].capitalize())
+                    day  = int(m.group(2))
+                    hour = int(m.group(3))
+                    mins = int(m.group(4))
+                    ampm = m.group(5).upper()
+                    if ampm == "PM" and hour != 12:
+                        hour += 12
+                    elif ampm == "AM" and hour == 12:
+                        hour = 0
+                    year = datetime.datetime.now().year
+                    return datetime.datetime(year, mon, day, hour, mins)
+                except ValueError:
+                    pass
+            return None
+
+        is_stan  = (platform == "Stan")
+        is_espn  = (platform == "ESPN+ US")
 
         if is_prime:
             # For Prime Video: wait for buy-box-msg to render, then read ONLY that element.
@@ -1874,6 +1957,26 @@ class App:
 
             if dt_found is None:
                 messagebox.showinfo("Scan", "No Stan date/time found on page.\n"
+                                            "Make sure you're on the event page showing the start time.")
+                return
+
+        # 1c. ESPN+ US — "Monday, July 6 | 7:30 PM" (local PC time, no conversion needed)
+        if is_espn and dt_found is None:
+            try:
+                espn_text = self.driver.execute_script("""
+                    var el = document.querySelector('.WatchPaywall__subtitle');
+                    return el ? (el.innerText || el.textContent || '').trim() : null;
+                """)
+                self.log(f"  🔍  Scan [ESPN+ WatchPaywall__subtitle]: {repr(espn_text[:80]) if espn_text else 'None'}", "PRECHECK")
+                dt_found = _parse_espn(espn_text) if espn_text else None
+            except Exception as e:
+                self.log(f"  🔍  Scan [ESPN+] error: {e}", "PRECHECK")
+
+            if dt_found is None:
+                dt_found = _parse_espn(page_text)
+
+            if dt_found is None:
+                messagebox.showinfo("Scan", "No ESPN+ date/time found on page.\n"
                                             "Make sure you're on the event page showing the start time.")
                 return
 
@@ -1974,7 +2077,7 @@ class App:
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo", "Hotstar"):
+        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo", "Hotstar", "ESPN+ US"):
             self.browser_size_var.set("MD — 650×550")
         elif name in ("FanCode", "Stan"):
             self.browser_size_var.set("LG — 750×650")
