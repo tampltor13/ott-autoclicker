@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "1.0.99"
+VERSION = "2.0.0"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -74,9 +74,10 @@ PLATFORMS = {
     "Tencent":    "https://sports.qq.com/kbsweb/index.htm",
     "Stan":       "https://play.stan.com.au/sport",
     "WOWOW":      "https://wod.wowow.co.jp/live-schedule",
-    "ESPN+ US":   "https://www.espn.com/watch/schedule",
-    "Fubo":       "https://www.fubo.tv/",
-    "Hotstar":    "https://www.hotstar.com/in/home",
+    "ESPN+ US":    "https://www.espn.com/watch/schedule",
+    "Victory+":    "https://victoryplus.com/",
+    "Fubo":        "https://www.fubo.tv/",
+    "Hotstar":     "https://www.hotstar.com/in/home",
 }
 # Predefined rules per platform: selector type + click targets (one per line)
 PLATFORM_RULES = {
@@ -311,6 +312,13 @@ PLATFORM_RULES = {
         "freeze_recovery":   "refresh_only",
         "scan_offset":       10,
     },
+    "Victory+": {
+        "video_detect":      True,
+        "video_detect_js":   "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
+        "refresh_first":     True,
+        "load_wait":         15,
+        "freeze_recovery":   "refresh_only",
+    },
     "WOWOW": {
         "video_detect":       True,
         "video_detect_js":    "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
@@ -367,6 +375,7 @@ _load_smtp_config()
 PLATFORM_VPN_COUNTRY = {
     "Prime Video USA": "US",
     "ESPN+ US":        "US",
+    "Victory+":        "US",
     "Peacock":         "US",
     "Prime Video IT":  "IT",
     "Prime Video BR":  "BR",
@@ -2072,7 +2081,7 @@ class App:
         if scan_off is not None:
             self.scan_offset_var.set(scan_off)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW", "Victory+"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -3096,7 +3105,7 @@ class App:
                 freeze_end_dt = self._freeze_end_dt
             else:
                 start_dt = getattr(self, "_monitor_start_dt", datetime.datetime.now())
-                freeze_end_dt = start_dt + datetime.timedelta(hours=4)
+                freeze_end_dt = start_dt + datetime.timedelta(hours=6)
                 self._freeze_end_dt = freeze_end_dt
             FREEZE_DELAY = 60
             self.root.after(0, lambda: self._flog(
