@@ -38,7 +38,7 @@ except ImportError:
     WDM = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "2.0.0"
+VERSION = "2.0.11"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -75,7 +75,11 @@ PLATFORMS = {
     "Stan":       "https://play.stan.com.au/sport",
     "WOWOW":      "https://wod.wowow.co.jp/live-schedule",
     "ESPN+ US":    "https://www.espn.com/watch/schedule",
-    "Victory+":    "https://victoryplus.com/",
+    "Viaplay DK":    "https://viaplay.dk/",
+    "Victory+":      "https://victoryplus.com/",
+    "U-Next":        "https://video.unext.jp/",
+    "Dailymotion":   "https://www.dailymotion.com",
+    "Teleantillas":  "https://teleantillas.com.do/en-vivo/",
     "Fubo":        "https://www.fubo.tv/",
     "Hotstar":     "https://www.hotstar.com/in/home",
 }
@@ -154,11 +158,13 @@ PLATFORM_RULES = {
         "scan_offset":     30,
     },
     "Peacock": {
-        "selector":      "XPath",
-        "targets":       '//*[@data-testid="watch-button"]',
-        "refresh_first": True,
-        "click_delay":   2,
-        "load_wait":     10,
+        "selector":               "XPath",
+        "targets":                '//*[@data-testid="watch-button"]',
+        "refresh_first":          True,
+        "click_delay":            2,
+        "load_wait":              10,
+        "scan_offset":            30,
+        "freeze_profile_selector": '//div[contains(@class,"profiles__avatars--slider")]',
     },
     "Coupang Play": {
         "selector":      "XPath",
@@ -312,6 +318,31 @@ PLATFORM_RULES = {
         "freeze_recovery":   "refresh_only",
         "scan_offset":       10,
     },
+    "Dailymotion": {
+        "refresh_first":     False,
+        "freeze_recovery":   "refresh_only",
+    },
+    "Teleantillas": {
+        "refresh_first":     False,
+        "freeze_recovery":   "refresh_only",
+        "freeze_iframe_src": ["dailymotion.com", "geo.dailymotion.com"],
+        "freeze_unmute_selector": '//button[@data-testid="tap-to-unmute"]',
+    },
+    "Viaplay DK": {
+        "selector":        "XPath",
+        "targets":         '//*[@data-testid="play-button-text"]',
+        "refresh_first":   True,
+        "load_wait":       10,
+        "freeze_recovery": "refresh_only",
+        "scan_offset":     30,
+    },
+    "U-Next": {
+        "selector":      "XPath",
+        "targets":       '//*[@data-testid="liveTitleDetail-stage-play"]',
+        "refresh_first": True,
+        "load_wait":     8,
+        "scan_offset":   30,
+    },
     "Victory+": {
         "video_detect":      True,
         "video_detect_js":   "const v = document.querySelector('video'); return !!(v && !v.paused && !v.error && v.currentTime > 0 && v.readyState >= 3);",
@@ -385,6 +416,7 @@ PLATFORM_VPN_COUNTRY = {
     "Prime Video JP":  "JP",
     "Prime Video MX":  "MX",
     "Prime Video FR":  "FR",
+    "Viaplay DK":      "HR",   # no VPN needed — direct HR IP is expected and OK
 }
 # ─────────────────────────────────────────────────────────────────────────────
 MONO_FONT   = ("Menlo", 11) if IS_MAC else ("Consolas", 11)
@@ -916,6 +948,8 @@ class App:
         self._freeze_recovery    = "refresh_only"
         self._freeze_profile_selector = ""
         self._freeze_live_selector    = ""
+        self._freeze_iframe_src       = ""
+        self._freeze_unmute_selector  = ""
         r += 1
 
         # selector type
@@ -1300,14 +1334,25 @@ class App:
             # sample currentTime
             current_time = None
             try:
-                if self._freeze_video_js:
-                    current_time = self.driver.execute_script(self._freeze_video_js)
-                else:
-                    current_time = self.driver.execute_script(
-                        "const vids = document.querySelectorAll('video');"
-                        "const v = Array.from(vids).find(v => !v.paused && v.readyState > 0)"
-                        "         || vids[vids.length - 1];"
-                        "return v ? v.currentTime : null;")
+                iframe_srcs = getattr(self, "_freeze_iframe_src", "")
+                if iframe_srcs:
+                    # support single string or list for nested iframes
+                    if isinstance(iframe_srcs, str):
+                        iframe_srcs = [iframe_srcs]
+                    # switch through each iframe level in sequence
+                    for src in iframe_srcs:
+                        try:
+                            iframe_el = self.driver.find_element(
+                                "xpath", f'//iframe[contains(@src, "{src}")]')
+                            self.driver.switch_to.frame(iframe_el)
+                        except Exception:
+                            break  # iframe not found at this level, stop switching
+                js_to_run = (self._freeze_video_js if self._freeze_video_js else
+                             "const vids = document.querySelectorAll('video');"
+                             "const v = Array.from(vids).find(v => !v.paused && v.readyState > 0)"
+                             "         || vids[vids.length - 1];"
+                             "return v ? v.currentTime : null;")
+                current_time = self.driver.execute_script(js_to_run)
             except Exception as e:
                 err = str(e)
                 # check if tab crashed (OOM etc.) — URL may now be an error page
@@ -1330,6 +1375,11 @@ class App:
                 except Exception:
                     pass
                 self.root.after(0, lambda m=err: self._flog(f"  JS error: {m}", "ERROR"))
+            finally:
+                try:
+                    self.driver.switch_to.default_content()
+                except Exception:
+                    pass
 
             if current_time is None:
                 self.root.after(0, lambda: self._flog(
@@ -1419,6 +1469,8 @@ class App:
             self._freeze_try_profile_select()
             # check for platform-specific "Play Live" dialog after refresh (e.g. WOWOW)
             self._try_live_selector()
+            # click unmute button inside iframe if platform needs it after refresh (e.g. Teleantillas)
+            self._try_unmute()
 
     def _freeze_try_join_live(self):
         """After freeze refresh, click #joinLive if present (DAZN 'Join live' button)."""
@@ -1465,6 +1517,38 @@ class App:
                     "  ▶  'Play Live' dialog detected — clicked to start live stream.", "OK"))
         except Exception:
             pass  # dialog not present — video resumed on its own, continue normally
+
+    def _try_unmute(self):
+        """After refresh, switch into freeze_iframe_src frames and click the unmute button
+        (freeze_unmute_selector XPath). Silent no-op if selector empty or element not found."""
+        if not self._alive():
+            return
+        xpath = getattr(self, "_freeze_unmute_selector", "")
+        if not xpath:
+            return
+        iframe_srcs = getattr(self, "_freeze_iframe_src", "")
+        if isinstance(iframe_srcs, str):
+            iframe_srcs = [iframe_srcs] if iframe_srcs else []
+        try:
+            for src in iframe_srcs:
+                try:
+                    iframe_el = self.driver.find_element(
+                        "xpath", f'//iframe[contains(@src, "{src}")]')
+                    self.driver.switch_to.frame(iframe_el)
+                except Exception:
+                    break
+            el = self.driver.find_element("xpath", xpath)
+            if el and el.is_displayed():
+                el.click()
+                self.root.after(0, lambda: self._flog(
+                    "  🔊  Unmute button found — clicked to unmute player.", "OK"))
+        except Exception:
+            pass  # unmute button not present — video already unmuted or not loaded yet
+        finally:
+            try:
+                self.driver.switch_to.default_content()
+            except Exception:
+                pass
 
     def _freeze_remonitor(self):
         """Restart click monitoring after a freeze. When click succeeds, freeze detection resumes."""
@@ -1915,8 +1999,39 @@ class App:
                     pass
             return None
 
-        is_stan  = (platform == "Stan")
-        is_espn  = (platform == "ESPN+ US")
+        is_stan      = (platform == "Stan")
+        is_espn      = (platform == "ESPN+ US")
+        is_viaplay_dk = (platform == "Viaplay DK")
+
+        def _parse_viaplay_dk(text):
+            # Format: "I dag kl. 07.30" (today), "I morgen kl. 07.30" (tomorrow)
+            # or Danish weekday: "Mandag kl. 07.30" etc.
+            # Time uses dot separator: HH.MM
+            if not text:
+                return None
+            m = re.search(r'\bkl\.\s*(\d{1,2})\.(\d{2})\b', text, re.IGNORECASE)
+            if not m:
+                return None
+            try:
+                hour = int(m.group(1))
+                mins = int(m.group(2))
+                now  = datetime.datetime.now()
+                base = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                if re.search(r'\bI morgen\b', text, re.IGNORECASE):
+                    base = base + datetime.timedelta(days=1)
+                else:
+                    DK_DAYS = {"Mandag":0,"Tirsdag":1,"Onsdag":2,"Torsdag":3,
+                               "Fredag":4,"Lørdag":5,"Lordag":5,"Søndag":6,"Sondag":6}
+                    for dk_day, weekday in DK_DAYS.items():
+                        if re.search(r'\b' + dk_day + r'\b', text, re.IGNORECASE):
+                            days_ahead = (weekday - now.weekday()) % 7
+                            base = now.replace(hour=0, minute=0, second=0, microsecond=0) \
+                                   + datetime.timedelta(days=days_ahead)
+                            break
+                    # else "I dag" or unrecognised prefix → today (base unchanged)
+                return base.replace(hour=hour, minute=mins)
+            except ValueError:
+                return None
 
         if is_prime:
             # For Prime Video: wait for buy-box-msg to render, then read ONLY that element.
@@ -1986,6 +2101,26 @@ class App:
 
             if dt_found is None:
                 messagebox.showinfo("Scan", "No ESPN+ date/time found on page.\n"
+                                            "Make sure you're on the event page showing the start time.")
+                return
+
+        # 1d. Viaplay DK — "I dag kl. 07.30" from StartTime_container element
+        if is_viaplay_dk and dt_found is None:
+            try:
+                viaplay_text = self.driver.execute_script("""
+                    var el = document.querySelector('[class*="StartTime_container"]');
+                    return el ? (el.innerText || el.textContent || '').trim() : null;
+                """)
+                self.log(
+                    f"  🔍  Scan [Viaplay DK StartTime_container]: "
+                    f"{repr(viaplay_text[:80]) if viaplay_text else 'None'}", "PRECHECK")
+                dt_found = _parse_viaplay_dk(viaplay_text) if viaplay_text else None
+            except Exception as e:
+                self.log(f"  🔍  Scan [Viaplay DK] error: {e}", "PRECHECK")
+            if dt_found is None:
+                dt_found = _parse_viaplay_dk(page_text)
+            if dt_found is None:
+                messagebox.showinfo("Scan", "No Viaplay DK time found on page.\n"
                                             "Make sure you're on the event page showing the start time.")
                 return
 
@@ -2076,12 +2211,14 @@ class App:
             self._freeze_recovery    = rule.get("freeze_recovery", "refresh_only")
             self._freeze_profile_selector = rule.get("freeze_profile_selector", "")
             self._freeze_live_selector    = rule.get("freeze_live_selector", "")
+            self._freeze_iframe_src       = rule.get("freeze_iframe_src", "")
+            self._freeze_unmute_selector  = rule.get("freeze_unmute_selector", "")
         # scan offset default per platform
         scan_off = PLATFORM_RULES.get(name, {}).get("scan_offset", None)
         if scan_off is not None:
             self.scan_offset_var.set(scan_off)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW", "Victory+"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW", "Victory+", "Dailymotion", "Teleantillas", "U-Next"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -2097,7 +2234,7 @@ class App:
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
-                    "Disney+ AR", "FanCode", "Stan", "WOWOW"):
+                    "Disney+ AR", "FanCode", "Stan", "WOWOW", "Viaplay DK"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
