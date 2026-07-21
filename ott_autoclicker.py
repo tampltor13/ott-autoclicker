@@ -161,10 +161,11 @@ PLATFORM_RULES = {
         "selector":               "XPath",
         "targets":                '//*[@data-testid="watch-button"]',
         "refresh_first":          True,
-        "click_delay":            2,
+        "click_delay":            3,
         "load_wait":              10,
         "scan_offset":            30,
-        "freeze_profile_selector": '//div[contains(@class,"profiles__avatars--slider")]',
+        "freeze_profile_selector": '//div[contains(@class,"profiles__avatar--image") and contains(@aria-label,"Ingrid")]',
+        "freeze_live_selector":    '//*[@data-testid="watch-button"]',
     },
     "Coupang Play": {
         "selector":      "XPath",
@@ -1498,6 +1499,7 @@ class App:
                 el.click()
                 self.root.after(0, lambda: self._flog(
                     "  ▶  Profile chooser detected — clicked profile avatar to resume.", "OK"))
+                time.sleep(3)  # wait for profile to load before next step (e.g. watch-button)
         except Exception:
             pass  # profile chooser not present — video resumed on its own, continue normally
 
@@ -3185,6 +3187,139 @@ class App:
 </body>
 </html>"""
 
+    def _precheck_page_health(self):
+        """Refresh the event page and check for error indicators (404, 'sorry', etc.).
+        Called after _precheck_ip_info() — browser is already back on the original window."""
+        try:
+            current_url = self.driver.current_url
+            self.root.after(0, lambda: self.log(
+                "  🔍  Page health check — refreshing event page…", "PRECHECK"))
+            self.driver.refresh()
+            time.sleep(6)
+            page_text = self.driver.execute_script(
+                "return (document.body ? "
+                "(document.body.innerText || document.body.textContent || '') : '');")
+            page_lower = page_text.lower() if page_text else ""
+            ERROR_PHRASES = ["sorry", "couldn't find", "page not found", "404"]
+            detected = next((p for p in ERROR_PHRASES if p in page_lower), None)
+            if detected:
+                self.root.after(0, lambda p=detected, u=current_url: self.log(
+                    f"  🔴  Page health FAILED — '{p}' detected on page: {u}", "ERROR"))
+                self._send_page_health_alert(current_url, detected)
+            else:
+                self.root.after(0, lambda: self.log(
+                    "  ✅  Page health OK — event page loaded without errors.", "PRECHECK"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  ⚠  Page health check failed: {m}", "WARN"))
+
+    def _send_page_health_alert(self, url, detected_phrase):
+        """Send email alert when the event page returns a 404 / sorry error."""
+        platform_name = self.platform_var.get() if hasattr(self, "platform_var") else "?"
+        now = datetime.datetime.now()
+        start_str = self._monitor_start_dt.strftime("%Y-%m-%d %H:%M:%S") if hasattr(self, "_monitor_start_dt") else "?"
+        check_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        if hasattr(self, "_monitor_start_dt"):
+            delta = self._monitor_start_dt - now
+            total_s = max(0, int(delta.total_seconds()))
+            h, rem = divmod(total_s, 3600)
+            m, s   = divmod(rem, 60)
+            until_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
+        else:
+            until_str = "?"
+        if not PRECHECK_SMTP_USER or not PRECHECK_SMTP_PASS or not PRECHECK_MAIL_TO:
+            self.root.after(0, lambda: self.log(
+                "  ⚠  Page health alert: mail not configured.", "WARN"))
+            return
+        try:
+            plain = (
+                f"OTT AutoClicker pre-check FAILED — event page returned an error.\n\n"
+                f"Platform  : {platform_name}\n"
+                f"URL       : {url}\n"
+                f"Detected  : '{detected_phrase}' found in page\n"
+                f"Check time: {check_str}\n"
+                f"Start time: {start_str}\n\n"
+                f"The event URL may have changed. Please update the URL in the browser before monitoring starts."
+            )
+            html = self._build_page_health_alert_html(
+                platform_name, url, detected_phrase, check_str, start_str, until_str)
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"🔴 Page Error Detected [{platform_name}]"
+            msg["From"]    = PRECHECK_MAIL_FROM
+            msg["To"]      = PRECHECK_MAIL_TO
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(html, "html", "utf-8"))
+            with smtplib.SMTP(PRECHECK_SMTP_HOST, PRECHECK_SMTP_PORT, timeout=15) as s:
+                s.starttls()
+                s.login(PRECHECK_SMTP_USER, PRECHECK_SMTP_PASS)
+                s.sendmail(PRECHECK_MAIL_FROM, [PRECHECK_MAIL_TO], msg.as_string())
+            self.root.after(0, lambda: self.log(
+                f"  ✉  Page health alert sent to {PRECHECK_MAIL_TO}.", "WARN"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self.log(
+                f"  ✉  Page health alert — mail send failed: {m}", "ERROR"))
+
+    def _build_page_health_alert_html(self, platform_name, url, detected_phrase,
+                                       check_str, start_str, until_str):
+        return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:#e67e22;padding:24px 32px;">
+            <span style="font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">⚠ Page Error Detected</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 24px 32px;">
+            <p style="margin:0 0 20px 0;font-size:15px;color:#333333;line-height:1.6;">
+              The event page returned an error during pre-check.<br>
+              The URL may have changed — please update it in the browser before monitoring starts.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-radius:4px;overflow:hidden;">
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;width:170px;">Platform</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{platform_name}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;">Detected</td>
+                <td style="padding:10px 14px;font-size:14px;color:#e67e22;font-weight:bold;">"{detected_phrase}" on page</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;">URL</td>
+                <td style="padding:10px 14px;font-size:13px;color:#2980b9;word-break:break-all;font-family:monospace;">{url}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;">Check time</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{check_str}</td>
+              </tr>
+              <tr style="background:#ebebeb;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;">Monitoring start</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;">{start_str}</td>
+              </tr>
+              <tr style="background:#ffffff;">
+                <td style="padding:10px 14px;border-left:4px solid #e67e22;font-size:13px;color:#555555;">Until live</td>
+                <td style="padding:10px 14px;font-size:14px;color:#111111;font-weight:bold;">{until_str}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #eeeeee;">
+            <p style="margin:0;font-size:12px;color:#aaaaaa;">OTT AutoClicker &nbsp;·&nbsp; autoclicker@global-mmk.com</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
     def _precheck_loop(self, s_dt):
         """Determine check time based on start time, then verify browser is alive.
         - 00:00–04:59 (night): check at 23:00 the previous evening
@@ -3222,6 +3357,7 @@ class App:
             if result == 1:
                 self.root.after(0, lambda: self.log("  ✅  Browser OK — browser is connected.", "PRECHECK"))
                 self._precheck_ip_info()
+                self._precheck_page_health()
             else:
                 raise RuntimeError(f"Unexpected script result: {result}")
         except Exception as e:
