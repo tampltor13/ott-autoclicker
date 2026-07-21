@@ -2,6 +2,201 @@ OTT AutoClicker — Changelog
 ===========================
 
 
+v2.0.14 — Peacock: freeze_live_selector + wait nakon profile clicka + click_delay 3s
+-----------------------------------------------------------------------
+- Dodano freeze_live_selector za Peacock: //*[@data-testid="watch-button"]
+  Nakon što se klikne Ingrid profil, watch-button se klikne automatski
+- Dodano time.sleep(3) u _freeze_try_profile_select() nakon uspješnog clicka
+  da se profil stigne učitati prije nego _try_live_selector() pokuša naći watch-button
+- click_delay povećan s 2 na 3 sekunde (razmak između klikova na targete)
+
+v2.0.13 — Peacock: ispravak freeze_profile_selector (klik na Ingrid profil)
+-----------------------------------------------------------------------
+- Stari XPath klikao je container div (profiles__avatars--slider) koji nije selectable
+- Novi XPath cilja točni clickable element: profiles__avatar--image s aria-label="Ingrid"
+  //div[contains(@class,"profiles__avatar--image") and contains(@aria-label,"Ingrid")]
+- Ovaj element ima role="button" i tabindex="0" — pravi clickable
+
+v2.0.12 — Pre-check: page health check (404 / sorry detekcija)
+-----------------------------------------------------------------------
+- Pre-check sada nakon IP provjere refresha event stranicu i skenira sadržaj
+- Traži poznate error fraze: "sorry", "couldn't find", "page not found", "404"
+- Ako se detektira greška → šalje SMTP mail "🔴 Page Error Detected [Platform]"
+  - Naranačsti header (distinktivan od crvenog "Browser Disconnected" maila)
+  - Prikazuje: platform, detektirana fraza, URL koji je failao, check time, start time
+- Koristi isti smtp_config.txt — nije potrebna nikakva izmjena konfiguracije
+- Primjer: night pre-check u 23:00 bi otkrio Amazon 404 i dao vremena za ispravak URL-a
+- Nova metoda: _precheck_page_health(), _send_page_health_alert(), _build_page_health_alert_html()
+
+v2.0.11 — Nova platforma: Viaplay DK
+-----------------------------------------------------------------------
+- Dodana platforma Viaplay DK (https://viaplay.dk/)
+- Button: //*[@data-testid="play-button-text"]
+- refresh_first: True, load_wait: 10s, freeze_recovery: refresh_only (video nastavlja sam)
+- Scan offset: 30 min; freeze detection ON po defaultu
+- Default browser: Chrome
+- Scan parser: "I dag kl. 07.30" format (danski, točka kao separator)
+  Podržava: I dag (danas), I morgen (sutra), danski dani u tjednu (Mandag, Tirsdag…)
+  JS čita [class*="StartTime_container"] element; fallback na cijeli page_text
+- Channels.csv: Denmark, Viaplay DK, C22OTT, Chrome
+
+v2.0.10 — U-Next: ispravak (maknut video_detect, samo klik)
+-----------------------------------------------------------------------
+- U-Next nije video_detect platforma — autoclicker jednostavno klikne play button
+- Button: //*[@data-testid="liveTitleDetail-stage-play"] ("ライブ配信を視聴")
+- refresh_first: True, load_wait: 15s, scan_offset: 30 min
+- Korisnik navigira na konkretan live event URL; PLATFORMS homepage je samo polazišna točka
+
+v2.0.9 — Nova platforma: U-Next
+-----------------------------------------------------------------------
+- Dodana platforma U-Next (https://video.unext.jp/)
+- Button: //*[@data-testid="liveTitleDetail-stage-play"] ("ライブ配信を視聴")
+- refresh_first: True, load_wait: 15s, video_detect: True, freeze_recovery: refresh_only
+- Scan offset: 30 min
+- Default browser: Edge
+- Channels.csv: Japan, U-Next, C314 Japan, Edge
+
+v2.0.8 — Uklonjen windowed fullscreen (pre bugovito)
+-----------------------------------------------------------------------
+- Maknuta metoda _inject_windowed_fullscreen() i poziv iz driver startup-a
+- Fullscreen se ponaša standardno — browser/OS fullscreen kao i prije
+
+v2.0.7 — Windowed fullscreen: auto-restore nakon freeze refresha
+-----------------------------------------------------------------------
+- Problem: page refresh (freeze detection) brisao je fake fullscreen jer DOM element nestane
+- Rješenje: localStorage persistencija — pri ulasku u fake fullscreen, sprema se ključ
+  tipa "IFRAME:www.dailymotion.com" ili "VIDEO"; pri ESC izlasku ključ se briše
+- Na svakom page loadu (addScriptToEvaluateOnNewDocument): auto-restore logika čita
+  localStorage, traži isti tip elementa i re-enters fake fullscreen
+- Za iframeove: traži po hostname (npr. iframe[src*="www.dailymotion.com"])
+- Retry petlja: pokušava do 20 puta × 500ms (~10s) dok element nije dostupan u DOM-u
+- ESC i dalje briše localStorage pa sljedeći refresh NE restore-a (korisnik je izišao)
+
+v2.0.6 — Windowed fullscreen: ispravak za cross-origin iframeove (Dailymotion)
+-----------------------------------------------------------------------
+- v2.0.5 nije radio za Teleantillas/Dailymotion jer Page.addScriptToEvaluateOnNewDocument
+  ne injektira u cross-origin iframeove (geo.dailymotion.com je poseban renderer proces)
+- Novo: fullscreenchange listener u main frameu hvata NATIVNI OS fullscreen event
+  koji bublira iz child iframea, odmah poziva PRAVI document.exitFullscreen() i
+  CSS-ekspandira iframe element na 100vw × 100vh — bez OS fullscreena
+- Nativni getter (Document.prototype.fullscreenElement) sprema se PRIJE overridea
+  da bismo mogli razlikovati pravi OS fullscreen od sintetičkih events
+- Isti ESC tipka za izlaz iz fake fullscreena
+
+v2.0.5 — Windowed fullscreen: fullscreen ostaje unutar browser prozora
+-----------------------------------------------------------------------
+- Nova metoda _inject_windowed_fullscreen(): poziva CDP Page.addScriptToEvaluateOnNewDocument
+  odmah nakon što se driver kreira — vrijedi za SVE stranice i SVE frameove (uključujući
+  cross-origin iframeove kao geo.dailymotion.com)
+- Klik na fullscreen gumb unutar video playera: video se proširi na 100vw × 100vh unutar
+  browser prozora — ne odlazi na OS fullscreen koji bi preuzeo cijeli monitor
+- ESC vraća video na originalnu veličinu
+- fullscreenElement / webkitFullscreenElement su overrideani pa player UI ispravno
+  prikazuje "exit fullscreen" kontrole
+- Vrijedi za sve platforme automatski — nema potrebe za posebnim postavkama po platformi
+
+v2.0.4 — Teleantillas: automatski unmute nakon freeze refresha
+-----------------------------------------------------------------------
+- Novi PLATFORM_RULES key: freeze_unmute_selector (XPath gumba za unmute)
+- Nova metoda _try_unmute(): nakon refresha switchá u iframe(ove), traži gumb i klika ga
+  Koristi isti freeze_iframe_src za navigaciju kroz iframeove (dailymotion.com → geo.dailymotion.com)
+- Teleantillas: freeze_unmute_selector = '//button[@data-testid="tap-to-unmute"]'
+  Video se nakon refresha pojavi mutiran — ovaj korak ga automatski odmutira
+- switch_to.default_content() uvijek u finally bloku — sigurno izlaženje iz iframea
+- Ostale platforme bez freeze_unmute_selector: ponašanje identično kao prije
+
+v2.0.3 — Freeze iframe: podrška za ugniježđene iframeove + Teleantillas platforma
+-----------------------------------------------------------------------
+- freeze_iframe_src sada prihvaća i string i listu stringova
+  Primjer: ["dailymotion.com", "geo.dailymotion.com"] — Selenium switchá razinu po razinu
+- Dodana platforma Teleantillas (https://teleantillas.com.do/en-vivo/)
+  freeze_iframe_src: ["dailymotion.com", "geo.dailymotion.com"]
+  Default browser: Edge
+
+v2.0.2 — Nova platforma: Dailymotion
+-----------------------------------------------------------------------
+- Dodana platforma Dailymotion (https://www.dailymotion.com)
+- Default browser: Edge
+- Bez video_detect — korisnik ručno navigira na live stream, pokreće Freeze Detection
+- Freeze recovery: refresh_only
+- Napomena: freeze_iframe_src nije potreban — na dailymotion.com video je u glavnom frameu
+
+v2.0.1 — Freeze Detection: podrška za cross-origin iframe video (Dailymotion i sl.)
+-----------------------------------------------------------------------
+- Novi PLATFORM_RULES key: freeze_iframe_src (string s dijelom iframe src URL-a)
+  Primjer: "freeze_iframe_src": "dailymotion.com"
+- Kad je postavljen: Selenium switchá na iframe, uzima currentTime, switchá nazad
+- Ako iframe nije pronađen: tiho pada na normalni JS u glavnom frameu
+- switch_to.default_content() uvijek se poziva u finally bloku — nema zaostajanja u iframeu
+- Postojeće platforme bez freeze_iframe_src: ponašanje identično kao prije
+
+v2.0.0 — Major release: Nova platforma Victory+
+-----------------------------------------------------------------------
+- Dodana platforma Victory+ (https://victoryplus.com/)
+- Mod: video_detect + refresh_first, load_wait 15s
+- Default browser: Edge
+- VPN precheck: US
+- channels.csv: USA / Victory+ / C36 / Edge
+- ESPN+ US channel ID-evi dodani: 372 (C17OTT), 3204 (C263 backup)
+
+v1.0.100 — Freeze Detection: default trajanje produženo na 6 sati
+-----------------------------------------------------------------------
+- Default end time za Freeze Detection: start_time + 6h (bilo je +4h)
+- Vrijedi kada monitoring završi i automatski pokrene freeze detection
+
+v1.0.99 — ESPN+ US: ispravka video_detect za višestruke video elemente
+-----------------------------------------------------------------------
+- ESPN+ stranica ima 2 video elementa: [0] dummy (currentTime=0, paused, src="")
+  i [1] pravi video (currentTime>0, playing, src=blob://)
+- document.querySelector('video') uvijek vraća prvi (dummy) → check uvijek fail
+- Fix: querySelectorAll + Array.some() — traži bilo koji video s currentTime > 1
+
+v1.0.98 — ESPN+ US: tipka M nakon detekcije videa (unmute)
+-----------------------------------------------------------------------
+- Dodano video_detect_key: "m" za ESPN+ US
+  ESPN+ startuje mjutan — nakon što video_detect potvrdi da video teče,
+  šalje se tipka M za unmute (identično kao kod drugih platformi)
+
+v1.0.97 — ESPN+ US Scan: uklonjen ET→CET/CEST offset (+6h)
+-----------------------------------------------------------------------
+- ESPN+ prikazuje vrijeme u lokalnoj vremenskoj zoni PCa (browser locale),
+  ne u ET — "7:30 PM" je već lokalno (CEST) pa konverzija nije potrebna
+- Maknuto: dt_et + timedelta(hours=6)
+- Sada: parsed datetime se koristi direktno bez ikakve konverzije
+
+v1.0.96 — Freeze: detekcija browser crash/OOM stranice
+-----------------------------------------------------------------------
+- Freeze loop sada eksplicitno prepoznaje crash URL-ove (chrome-error://, edge://crashedtab, about:neterror)
+  u dvije točke: prije JS uzorkovanja i nakon JS iznimke
+- Kad se detektira crash stranica: navigira direktno na platform URL umjesto refresh-a
+  (refresh na OOM stranici može opet crashirati — navigate je sigurniji)
+- Jasna log poruka: "Browser tab crashed (Out of Memory?) — navigating back to platform URL…"
+
+v1.0.95 — Freeze tab: "Now" gumb nije ažurirao datum
+-----------------------------------------------------------------------
+- Bug: "Now" gumb u Freeze tabu postavljao je samo vrijeme, datum ostajao nepromijenjen
+  Uočeno na PC-u u drugoj vremenskoj zoni (Japan) gdje je datum već bio +1 dan
+- Fix: dodana _set_freeze_start_now() metoda koja postavlja i datum i vrijeme
+  (identično kao _set_start_now() u Monitor tabu)
+
+v1.0.94 — ESPN+ US: ispravka video_detect JS provjere
+-----------------------------------------------------------------------
+- video_detect_js za ESPN+ US: uklonjen !v.paused i v.readyState >= 3
+  ESPN+ player prikazuje video ali Selenium ga vidi kao "paused" →
+  Monitor tab vrtio petlju beskonačno iako je video bio aktivan
+- Nova provjera: samo v.currentTime > 1 (identično freeze detection logici)
+- Freeze Detection radio ispravno jer koristi isti currentTime pristup
+
+v1.0.93 — Nova platforma: ESPN+ US + ET→CET/CEST scan konverzija
+-----------------------------------------------------------------------
+- Dodana platforma ESPN+ US (https://www.espn.com/watch/schedule)
+- Mod: video_detect + refresh_first, load_wait 15s (identično DAZN)
+- Default browser: Chrome, freeze detection: ON
+- VPN precheck: US (provjera da je browser IP u SAD)
+- Scan: _parse_espn() čita WatchPaywall__subtitle element
+  Format: "Monday, July 6 | 4:00 PM" (US Eastern Time)
+  Automatska konverzija ET → CET/CEST (+6h, vrijedi i ljeti i zimi)
+
 v1.0.92 — WOWOW: "ライブを再生" dialog handling + generički freeze_live_selector
 -----------------------------------------------------------------------
 - Novi mehanizam freeze_live_selector: generički XPath klik nakon refresha
