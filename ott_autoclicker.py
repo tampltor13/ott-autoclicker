@@ -27,18 +27,8 @@ try:
 except ImportError:
     SEL = False
 
-# ── webdriver-manager (optional fallback) ─────────────────────────────────────
-try:
-    from selenium.webdriver.chrome.service import Service as CService
-    from selenium.webdriver.edge.service   import Service as EService
-    from webdriver_manager.chrome import ChromeDriverManager
-    from webdriver_manager.microsoft import EdgeChromiumDriverManager
-    WDM = True
-except ImportError:
-    WDM = False
-
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "2.0.14"
+VERSION = "2.0.20"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -80,6 +70,8 @@ PLATFORMS = {
     "U-Next":        "https://video.unext.jp/",
     "Dailymotion":   "https://www.dailymotion.com",
     "Teleantillas":  "https://teleantillas.com.do/en-vivo/",
+    "Kayo Sports":   "https://kayosports.com.au/",
+    "SPOTV Now ID":  "https://www.spotvnow.com/",
     "Fubo":        "https://www.fubo.tv/",
     "Hotstar":     "https://www.hotstar.com/in/home",
 }
@@ -158,14 +150,12 @@ PLATFORM_RULES = {
         "scan_offset":     30,
     },
     "Peacock": {
-        "selector":               "XPath",
-        "targets":                '//*[@data-testid="watch-button"]',
-        "refresh_first":          True,
-        "click_delay":            3,
-        "load_wait":              10,
-        "scan_offset":            30,
-        "freeze_profile_selector": '//div[contains(@class,"profiles__avatar--image") and contains(@aria-label,"Ingrid")]',
-        "freeze_live_selector":    '//*[@data-testid="watch-button"]',
+        "selector":      "XPath",
+        "targets":       '//div[contains(@class,"profiles__avatar--image") and contains(@aria-label,"Ingrid")]\n//*[@data-testid="watch-button"]',
+        "refresh_first": True,
+        "click_delay":   3,
+        "load_wait":     10,
+        "scan_offset":   30,
     },
     "Coupang Play": {
         "selector":      "XPath",
@@ -281,6 +271,22 @@ PLATFORM_RULES = {
         "selector":      "XPath",
         "targets":       "",
         "refresh_first": False,
+    },
+    "SPOTV Now ID": {
+        "selector":             "XPath",
+        "targets":              '//button[@aria-label="Play"]',
+        "refresh_first":        True,
+        "load_wait":            10,
+        "freeze_recovery":      "refresh_only",
+        "freeze_live_selector": '//button[@aria-label="Play"]',
+        "hide_controls_selector": "header, nav, h1, [class*='breadcrumb'], [class*='header']",
+    },
+    "Kayo Sports": {
+        "selector":      "XPath",
+        "targets":       '//button[@data-test-id="join-live-button"]',
+        "refresh_first": True,
+        "click_delay":   3,
+        "load_wait":     35,
     },
     "Fubo": {
         "selector":         "XPath",
@@ -2215,12 +2221,13 @@ class App:
             self._freeze_live_selector    = rule.get("freeze_live_selector", "")
             self._freeze_iframe_src       = rule.get("freeze_iframe_src", "")
             self._freeze_unmute_selector  = rule.get("freeze_unmute_selector", "")
+            self._hide_controls_selector  = rule.get("hide_controls_selector", "")
         # scan offset default per platform
         scan_off = PLATFORM_RULES.get(name, {}).get("scan_offset", None)
         if scan_off is not None:
             self.scan_offset_var.set(scan_off)
         # set default browser per platform
-        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW", "Victory+", "Dailymotion", "Teleantillas", "U-Next"):
+        if name in ("TOD", "Paramount+", "NBA Docomo", "Disney+ SE", "Disney+ DK", "Disney+ AR", "Disney+ BR", "Prime Video MX", "Coupang Play", "Peacock", "DAZN ES", "DStv", "FanCode", "Hotstar", "WOWOW", "Victory+", "Dailymotion", "Teleantillas", "U-Next", "SPOTV Now ID"):
             self.browser_var.set("Edge")
         elif name:
             self.browser_var.set("Chrome")
@@ -2236,7 +2243,8 @@ class App:
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
                     "Prime Video JP", "Prime Video MX", "Prime Video FR",
-                    "Disney+ AR", "FanCode", "Stan", "WOWOW", "Viaplay DK"):
+                    "Disney+ AR", "FanCode", "Stan", "WOWOW", "Viaplay DK",
+                    "Kayo Sports", "SPOTV Now ID"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -2452,128 +2460,8 @@ class App:
                     else:
                         self.root.after(0, lambda: self.log(
                             "Edge binary not found in registry or known paths", "WARN"))
-                    # find msedgedriver locally — avoids Selenium Manager network download
-                    import shutil as _shutil
-                    msedgedriver = None
-                    drv_name = "msedgedriver.exe" if not IS_MAC else "msedgedriver"
-                    # a) app folder (user can drop msedgedriver.exe next to the script)
-                    _app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-                    _local = os.path.join(_app_dir, drv_name)
-                    if os.path.exists(_local):
-                        msedgedriver = _local
-                    # b) PATH
-                    if not msedgedriver:
-                        msedgedriver = _shutil.which("msedgedriver") or _shutil.which(drv_name)
-                    # c) Selenium Manager cache  (~/.cache/selenium or %LOCALAPPDATA%\selenium)
-                    if not msedgedriver:
-                        _cache_roots = [
-                            os.path.join(os.environ.get("LOCALAPPDATA", ""), "selenium", "msedgedriver"),
-                            os.path.join(os.path.expanduser("~"), ".cache", "selenium", "msedgedriver"),
-                        ]
-                        for _cr in _cache_roots:
-                            if os.path.isdir(_cr):
-                                for _root, _dirs, _files in os.walk(_cr):
-                                    if drv_name in _files:
-                                        msedgedriver = os.path.join(_root, drv_name)
-                                        break
-                            if msedgedriver:
-                                break
-                    # version check: skip cached driver if major version doesn't match Edge
-                    if msedgedriver:
-                        try:
-                            import re as _re
-                            _cflags = 0x08000000 if not IS_MAC else 0
-                            # driver major version from cache path or --version
-                            _dm = None
-                            _m = _re.search(r'[/\\](\d+)\.\d+\.\d+\.\d+[/\\]', msedgedriver)
-                            if _m:
-                                _dm = int(_m.group(1))
-                            else:
-                                try:
-                                    _r = subprocess.run([msedgedriver, "--version"],
-                                        capture_output=True, text=True, timeout=5,
-                                        creationflags=_cflags)
-                                    _m2 = _re.search(r'(\d+)\.\d+', _r.stdout)
-                                    if _m2: _dm = int(_m2.group(1))
-                                except Exception: pass
-                            # Edge major version — try multiple registry locations + PowerShell fallback
-                            _em = None
-                            try:
-                                import winreg as _wr
-                                _reg_targets = [
-                                    (_wr.HKEY_CURRENT_USER,  r"Software\Microsoft\Edge\BLBeacon", "version"),
-                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Edge\BLBeacon", "version"),
-                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Edge\BLBeacon", "version"),
-                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}", "pv"),
-                                    (_wr.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}", "pv"),
-                                ]
-                                for _hive, _rk, _vname in _reg_targets:
-                                    try:
-                                        _k = _wr.OpenKey(_hive, _rk)
-                                        _v, _ = _wr.QueryValueEx(_k, _vname)
-                                        _wr.CloseKey(_k)
-                                        _em = int(_v.split(".")[0]); break
-                                    except Exception: pass
-                            except Exception: pass
-                            # PowerShell fallback: read version from Edge binary file
-                            if not _em and edge_bin and os.path.exists(edge_bin):
-                                try:
-                                    _ps = subprocess.run(
-                                        ["powershell", "-command",
-                                         f"(Get-Item '{edge_bin}').VersionInfo.ProductVersion"],
-                                        capture_output=True, text=True, timeout=8,
-                                        creationflags=_cflags)
-                                    _m3 = _re.search(r'(\d+)\.\d+', _ps.stdout.strip())
-                                    if _m3: _em = int(_m3.group(1))
-                                except Exception: pass
-                            # if driver version known but Edge version unknown → skip cache (safe default)
-                            if _dm and not _em:
-                                self.root.after(0, lambda: self.log(
-                                    "Edge version unknown — skipping cached driver, using Selenium Manager…", "WARN"))
-                                msedgedriver = None
-                            elif _dm and _em and _dm != _em:
-                                self.root.after(0, lambda dm=_dm, em=_em: self.log(
-                                    f"EdgeDriver v{dm} ≠ Edge v{em} — skipping cache, downloading v{em}…", "WARN"))
-                                msedgedriver = None
-                        except Exception:
-                            pass
-                    if msedgedriver:
-                        self.root.after(0, lambda d=msedgedriver: self.log(f"EdgeDriver: {d}"))
-                        self.driver = webdriver.Edge(service=EService(msedgedriver), options=o)
-                    else:
-                        self.root.after(0, lambda: self.log(
-                            "msedgedriver not found locally — Selenium Manager will download correct version…", "WARN"))
-                        self.driver = webdriver.Edge(options=o)
-                        # after Selenium Manager downloads the driver, copy it to app folder
-                        # so next launch finds it locally without re-downloading
-                        try:
-                            import shutil as _shutil2, re as _re2
-                            _app_dir2 = os.path.dirname(os.path.abspath(sys.argv[0]))
-                            _dest = os.path.join(_app_dir2, drv_name)
-                            _cache_roots2 = [
-                                os.path.join(os.environ.get("LOCALAPPDATA", ""), "selenium", "msedgedriver"),
-                                os.path.join(os.path.expanduser("~"), ".cache", "selenium", "msedgedriver"),
-                            ]
-                            _found_new = None
-                            for _cr2 in _cache_roots2:
-                                if os.path.isdir(_cr2):
-                                    for _root2, _dirs2, _files2 in os.walk(_cr2):
-                                        if drv_name in _files2:
-                                            _candidate = os.path.join(_root2, drv_name)
-                                            # only copy if version matches current Edge
-                                            _mv = _re2.search(r'[/\\](\d+)\.\d+\.\d+\.\d+[/\\]', _candidate)
-                                            if _mv and _em and int(_mv.group(1)) == _em:
-                                                _found_new = _candidate
-                                                break
-                                if _found_new:
-                                    break
-                            if _found_new:
-                                _shutil2.copy2(_found_new, _dest)
-                                self.root.after(0, lambda p=_dest: self.log(
-                                    f"EdgeDriver cached locally: {p}", "OK"))
-                        except Exception as _ce:
-                            self.root.after(0, lambda e=str(_ce): self.log(
-                                f"EdgeDriver cache copy skipped: {e}", "WARN"))
+                    # Selenium Manager handles msedgedriver automatically (same as Chrome)
+                    self.driver = webdriver.Edge(options=o)
                 # restore saved browser window position/size
                 prefs = self._load_prefs()
                 bkey = f"{browser.lower()}_browser"
@@ -3525,6 +3413,15 @@ class App:
                 self.root.after(0, self.stop_monitoring); break
             if ok > 0:
                 self.root.after(0, lambda: self.log("Click succeeded — stopping.", "OK"))
+                # hide video controls by moving mouse away from video area
+                hide_sel = getattr(self, "_hide_controls_selector", "")
+                if hide_sel and self._alive():
+                    try:
+                        from selenium.webdriver.common.action_chains import ActionChains
+                        el = self.driver.find_element("css selector", hide_sel)
+                        ActionChains(self.driver).move_to_element(el).perform()
+                    except Exception:
+                        pass
                 # post-click: try optional targets after page navigates (e.g. popup)
                 if self._post_click_targets:
                     self.root.after(0, lambda w=self._post_click_wait:
@@ -3572,6 +3469,14 @@ class App:
 if __name__ == "__main__":
     if not SEL:
         print("NOTE: selenium not installed — run:  pip3 install selenium")
+    # remove msedgedriver.exe from app folder if present — Selenium Manager handles Edge driver now
+    try:
+        _drv_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "msedgedriver.exe")
+        if os.path.exists(_drv_path):
+            os.remove(_drv_path)
+            print(f"Removed outdated msedgedriver.exe from app folder")
+    except Exception:
+        pass
     root = tk.Tk()
     try:
         App(root)
