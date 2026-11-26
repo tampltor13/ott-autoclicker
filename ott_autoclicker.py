@@ -28,7 +28,7 @@ except ImportError:
     SEL = False
 
 IS_MAC  = platform.system() == "Darwin"
-VERSION = "2.0.20"
+VERSION = "2.0.29"
 
 UPDATE_VERSION_URL = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/version.txt"
 UPDATE_SCRIPT_URL  = "https://raw.githubusercontent.com/tampltor13/ott-autoclicker/main/ott_autoclicker.py"
@@ -45,6 +45,7 @@ PLATFORMS = {
     "Prime Video JP":  "https://www.amazon.co.jp/",
     "Prime Video MX": "https://www.primevideo.com",
     "Prime Video FR": "https://www.primevideo.com",
+    "Prime Video AU": "https://www.primevideo.com",
     "DAZN DE":      "https://www.dazn.com/en-DE/home",
     "DAZN ES":      "https://www.dazn.com/en-ES/home",
     "DAZN IT":      "https://www.dazn.com/en-IT",
@@ -149,6 +150,14 @@ PLATFORM_RULES = {
         "freeze_recovery": "remonitor",
         "scan_offset":     30,
     },
+    "Prime Video AU": {
+        "selector":        "XPath",
+        "targets":         '//*[@data-automation-id="circular-playbutton"]\n//*[@data-testid="play"]',
+        "refresh_first":   True,
+        "click_delay":     2,
+        "freeze_recovery": "remonitor",
+        "scan_offset":     30,
+    },
     "Peacock": {
         "selector":      "XPath",
         "targets":       '//div[contains(@class,"profiles__avatar--image") and contains(@aria-label,"Ingrid")]\n//*[@data-testid="watch-button"]',
@@ -181,12 +190,21 @@ PLATFORM_RULES = {
     },
     "NBA Docomo": {
         "selector":      "XPath",
-        "targets":       '//video-js[contains(@class,"video-js")]',
+        # v2.0.21: Docomo redesign — game page now has a "LIVEを再生" button
+        # (CSS classes are hashed/unstable, so match by visible text)
+        # v2.0.22: player opens paused → 2nd target clicks player, then Space
+        "targets":       '//button[contains(normalize-space(.),"LIVEを再生")]\n'
+                         '//video-js | //video',
         "refresh_first": True,
         "click_delay":   2,
-        "scroll_after":  290,
+        "scroll_after":  0,       # v2.0.28: NO scrolling at all for Docomo (it pushed the player out of the W2C capture)
         "load_wait":     5,
         "key_press":     " ",
+        "key_press_last": True,   # send Space only after the LAST target (player)
+        "key_press_verify": True, # v2.0.23: check video plays, resend Space if not
+        "freeze_recovery": "remonitor",  # v2.0.24: after freeze refresh → LIVE + player + Space again
+        "skip_if_playing": True,  # v2.0.27: if the LIVE click already started the stream → no player click / Space (it would pause it)
+        # v2.0.28: Space stays — it starts the player when it does NOT play (player is clicked first, so Space is handled by the player and does not scroll the page)
         "scan_offset":   10,
     },
     "Paramount+": {
@@ -423,6 +441,7 @@ PLATFORM_VPN_COUNTRY = {
     "Prime Video JP":  "JP",
     "Prime Video MX":  "MX",
     "Prime Video FR":  "FR",
+    "Prime Video AU":  "AU",
     "Viaplay DK":      "HR",   # no VPN needed — direct HR IP is expected and OK
 }
 # ─────────────────────────────────────────────────────────────────────────────
@@ -936,6 +955,10 @@ class App:
         self.event_kw_var.trace_add("write", self._on_kw_changed)
         self._base_targets = ""
         self._key_press          = ""
+        self._key_press_last     = False
+        self._key_press_verify   = False
+        self._skip_if_playing    = False
+        self._scroll_top_after   = False
         self._post_refresh_key   = ""
         self._pre_click_targets  = []
         self._pre_click_wait     = 3
@@ -1294,7 +1317,8 @@ class App:
     def _freeze_loop(self, end_dt):
         CHECK_INTERVAL   = 30   # seconds between checks
         REFRESH_WAIT     = 60   # seconds to wait after refresh before re-checking
-        MAX_ZERO_RETRIES = 3    # stop after this many consecutive zero-baseline cycles
+        MAX_ZERO_RETRIES = 3    # after this many consecutive zero cycles → pause, then recover again
+        GIVE_UP_PAUSE    = 120  # v2.0.26: never give up — wait this long, then refresh/remonitor again
 
         end_label = end_dt.strftime("%H:%M") if end_dt else "∞ (no end time)"
         self.root.after(0, lambda: self._flog(
@@ -1303,6 +1327,7 @@ class App:
         prev_time        = None
         zero_retry_count = 0    # counts consecutive cycles where baseline was 0.0
         consec_zero_recovery = 0  # counts consecutive freeze recoveries where currentTime stayed 0.0
+        no_video_count   = 0    # counts consecutive cycles where no video element was found
 
         while self._freeze_running:
             # check end time (skip if indefinite)
@@ -1389,8 +1414,17 @@ class App:
                     pass
 
             if current_time is None:
-                self.root.after(0, lambda: self._flog(
-                    "  ⚠  No video element found — refreshing…", "WARN"))
+                no_video_count += 1
+                self.root.after(0, lambda n=no_video_count, m=MAX_ZERO_RETRIES: self._flog(
+                    f"  ⚠  No video element found — refreshing… ({n}/{m})", "WARN"))
+                if no_video_count >= MAX_ZERO_RETRIES:
+                    no_video_count = 0
+                    if not self._freeze_never_give_up(
+                            f"No video element found for {MAX_ZERO_RETRIES} consecutive checks",
+                            GIVE_UP_PAUSE, REFRESH_WAIT):
+                        break
+                    prev_time = None
+                    continue
                 self._do_freeze_refresh(REFRESH_WAIT)
                 prev_time = None
                 continue
@@ -1400,11 +1434,13 @@ class App:
                 if current_time == 0.0:
                     zero_retry_count += 1
                     if zero_retry_count >= MAX_ZERO_RETRIES:
-                        self.root.after(0, lambda: self._flog(
-                            f"  ⛔  Baseline currentTime=0.0 for {MAX_ZERO_RETRIES} consecutive cycles — "
-                            "video not playing. Stopping Freeze Detection.", "ERROR"))
-                        self.root.after(0, self.stop_freeze_detection)
-                        break
+                        zero_retry_count = 0
+                        if not self._freeze_never_give_up(
+                                f"Baseline currentTime=0.0 for {MAX_ZERO_RETRIES} consecutive cycles — video not playing",
+                                GIVE_UP_PAUSE, REFRESH_WAIT):
+                            break
+                        prev_time = None
+                        continue
                     self.root.after(0, lambda n=zero_retry_count, m=MAX_ZERO_RETRIES: self._flog(
                         f"  ⏳  Baseline=0.0 — video not started yet, retrying ({n}/{m})… waiting {CHECK_INTERVAL}s", "WARN"))
                     if not self._freeze_sleep(CHECK_INTERVAL):
@@ -1428,6 +1464,7 @@ class App:
                     f"  ✓  Video OK — currentTime={t:.1f}s (+{d:.1f}s)", "OK"))
                 prev_time = current_time
                 consec_zero_recovery = 0
+                no_video_count = 0
                 if not self._freeze_sleep(CHECK_INTERVAL):
                     break
             else:
@@ -1435,11 +1472,13 @@ class App:
                 if current_time == 0.0:
                     consec_zero_recovery += 1
                     if consec_zero_recovery >= MAX_ZERO_RETRIES:
-                        self.root.after(0, lambda: self._flog(
-                            f"  ⛔  currentTime=0.0 after {MAX_ZERO_RETRIES} consecutive recoveries — "
-                            "video unresponsive. Stopping Freeze Detection.", "ERROR"))
-                        self.root.after(0, self.stop_freeze_detection)
-                        break
+                        consec_zero_recovery = 0
+                        if not self._freeze_never_give_up(
+                                f"currentTime=0.0 after {MAX_ZERO_RETRIES} consecutive recoveries — video unresponsive",
+                                GIVE_UP_PAUSE, REFRESH_WAIT):
+                            break
+                        prev_time = None
+                        continue
                 else:
                     consec_zero_recovery = 0  # normal freeze (not zero), reset zero-recovery counter
                 self.root.after(0, lambda t=current_time, p=prev_time, d=delta, m=min_expected: self._flog(
@@ -1451,6 +1490,63 @@ class App:
         self.root.after(0, lambda: self._freeze_stop_btn.config(state="disabled"))
         self.root.after(0, lambda: self._freeze_start_btn.config(state="normal"))
         self.root.after(0, lambda: self._freeze_status_var.set("AntiFreeze inactive"))
+
+    def _freeze_never_give_up(self, reason, pause_s, refresh_wait):
+        """v2.0.26: instead of stopping Freeze Detection, pause, alert (max every 30 min) and recover again.
+        Keeps going until the freeze end time. Returns False only if Freeze Detection was stopped meanwhile."""
+        self.root.after(0, lambda r=reason, p=pause_s: self._flog(
+            f"  ⛔  {r}. NOT giving up — retrying in {p}s (until freeze end time).", "ERROR"))
+        now = time.time()
+        if now - getattr(self, "_last_freeze_alert", 0) > 1800:
+            self._last_freeze_alert = now
+            threading.Thread(target=self._send_freeze_alert, args=(reason,), daemon=True).start()
+        if not self._freeze_sleep(pause_s):
+            return False
+        self._do_freeze_refresh(refresh_wait)
+        return True
+
+    def _send_freeze_alert(self, reason):
+        """E-mail when the stream keeps failing (same SMTP settings as the pre-check alerts)."""
+        platform_name = self.platform_var.get() if hasattr(self, "platform_var") else "?"
+        if not PRECHECK_SMTP_USER or not PRECHECK_SMTP_PASS or not PRECHECK_MAIL_TO:
+            self.root.after(0, lambda: self._flog("  ⚠  Freeze alert: mail not configured.", "WARN"))
+            return
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        url = "?"
+        try:
+            url = self.driver.current_url
+        except Exception:
+            pass
+        rows = [("Platform", platform_name), ("Problem", reason), ("Time", now_str), ("URL", url),
+                ("Action", "AutoClicker keeps retrying every few minutes until the freeze end time.")]
+        plain = "OTT AutoClicker — stream keeps failing.\n\n" + "\n".join(f"{k}: {v}" for k, v in rows)
+        import html as _h
+        trs = "".join(
+            f'<tr style="background:{"#ebebeb" if i % 2 == 0 else "#ffffff"};">'
+            f'<td style="padding:10px 14px;border-left:4px solid #c0392b;font-size:13px;color:#555;width:150px;">{_h.escape(k)}</td>'
+            f'<td style="padding:10px 14px;font-size:14px;color:#111;word-break:break-all;">{_h.escape(str(v))}</td></tr>'
+            for i, (k, v) in enumerate(rows))
+        html = (f'<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">'
+                f'<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;"><tr><td align="center">'
+                f'<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">'
+                f'<tr><td style="background:#c0392b;padding:24px 32px;"><span style="font-size:22px;font-weight:bold;color:#fff;">❄ Stream keeps failing</span></td></tr>'
+                f'<tr><td style="padding:28px 32px;"><table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">{trs}</table></td></tr>'
+                f'</table></td></tr></table></body></html>')
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"❄ Stream keeps failing [{platform_name}]"
+            msg["From"]    = PRECHECK_MAIL_FROM
+            msg["To"]      = PRECHECK_MAIL_TO
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(html, "html", "utf-8"))
+            with smtplib.SMTP(PRECHECK_SMTP_HOST, PRECHECK_SMTP_PORT, timeout=15) as srv:
+                srv.starttls()
+                srv.login(PRECHECK_SMTP_USER, PRECHECK_SMTP_PASS)
+                srv.sendmail(PRECHECK_MAIL_FROM, [PRECHECK_MAIL_TO], msg.as_string())
+            self.root.after(0, lambda: self._flog(f"  ✉  Freeze alert sent to {PRECHECK_MAIL_TO}.", "WARN"))
+        except Exception as e:
+            err = str(e)
+            self.root.after(0, lambda m=err: self._flog(f"  ✉  Freeze alert — mail send failed: {m}", "ERROR"))
 
     def _do_freeze_refresh(self, wait_s):
         """Refresh page and wait before next check. If recovery=remonitor, restart click monitoring."""
@@ -1941,8 +2037,27 @@ class App:
                 except ValueError:
                     pass
 
+            # Format 1b: day first — "29 Jun 2026 3:10 PM AEDT" / "29 June 2026 19:30" (UK/AU style)
+            m = re.search(
+                r'\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|'
+                r'Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)'
+                r',?\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?',
+                text, re.IGNORECASE)
+            if m:
+                try:
+                    mon  = MONTHS.get(m.group(2).capitalize()) or MONTHS.get(m.group(2)[:3].capitalize())
+                    hour = int(m.group(4))
+                    ampm = (m.group(6) or "").upper()
+                    if ampm == "PM" and hour != 12:
+                        hour += 12
+                    elif ampm == "AM" and hour == 12:
+                        hour = 0
+                    return datetime.datetime(int(m.group(3)), mon, int(m.group(1)), hour, int(m.group(5)))
+                except (ValueError, TypeError):
+                    pass
+
             # Format 2: time only — "Watch Live: 15:10 CEST" (event is today, no date shown)
-            m2 = re.search(r'\b(\d{1,2}):(\d{2})\s*(?:CEST|CET|UTC|GMT|EST|PST|BST)?\b', text)
+            m2 = re.search(r'\b(\d{1,2}):(\d{2})\s*(?:CEST|CET|UTC|GMT|EST|PST|BST|AEDT|AEST|ACDT|ACST|AWST)?\b', text)
             if m2:
                 try:
                     now = datetime.datetime.now()
@@ -2200,6 +2315,10 @@ class App:
             else:
                 self.load_var.set(5)
             self._key_press          = rule.get("key_press", "")
+            self._key_press_last     = rule.get("key_press_last", False)
+            self._key_press_verify   = rule.get("key_press_verify", False)
+            self._skip_if_playing    = rule.get("skip_if_playing", False)
+            self._scroll_top_after   = rule.get("scroll_top_after", False)
             self._post_refresh_key   = rule.get("post_refresh_key", "")
             self._pre_click_targets  = rule.get("pre_click_targets", "").splitlines()
             self._pre_click_wait     = rule.get("pre_click_wait", 3)
@@ -2242,9 +2361,9 @@ class App:
         if name in ("DAZN DE", "DAZN ES", "DAZN IT", "DStv",
                     "Prime Video USA", "Prime Video IT", "Prime Video BR",
                     "Prime Video UK", "Prime Video DE", "Prime Video ES",
-                    "Prime Video JP", "Prime Video MX", "Prime Video FR",
+                    "Prime Video JP", "Prime Video MX", "Prime Video FR", "Prime Video AU",
                     "Disney+ AR", "FanCode", "Stan", "WOWOW", "Viaplay DK",
-                    "Kayo Sports", "SPOTV Now ID"):
+                    "Kayo Sports", "SPOTV Now ID", "NBA Docomo"):
             self.freeze_detect_var.set(True)
         else:
             self.freeze_detect_var.set(False)
@@ -2648,7 +2767,7 @@ class App:
         scroll_px = self.scroll_after_var.get()
         if load_s > 0: time.sleep(load_s)
         # scroll BEFORE click when key_press is used (e.g. NBA Docomo)
-        if self._key_press and scroll_px > 0:
+        if self._key_press and not self._key_press_last and scroll_px > 0:
             self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
             self.log(f"  ↓  scrolled {scroll_px}px before click", "OK")
             time.sleep(0.5)
@@ -2668,7 +2787,24 @@ class App:
             except Exception:
                 pass  # continue anyway
         ok = 0
-        for t in targets:
+        for idx, t in enumerate(targets):
+            # skip_if_playing: after the first click the stream may already run →
+            # clicking the player / pressing Space would pause it or scroll the page
+            if idx > 0 and self._skip_if_playing:
+                playing_now = False
+                for _ in range(5):                       # up to ~5 s for the stream to start after the LIVE click
+                    time.sleep(1.0)
+                    if self._video_playing():
+                        playing_now = True
+                        break
+                if playing_now:
+                    rest = len(targets) - idx
+                    self.log(f"  ▶  video already playing — skipping {rest} remaining step(s) (no player click / Space)", "OK")
+                    ok += rest
+                    break
+            is_last = (idx == len(targets) - 1)
+            # key_press_last: key is sent only after the last target
+            send_key = self._key_press and (not self._key_press_last or is_last)
             try:
                 if self._force_js_click:
                     el = WebDriverWait(self.driver, 8).until(
@@ -2694,14 +2830,17 @@ class App:
                         el.click()
                     except ElementClickInterceptedException:
                         self.driver.execute_script("arguments[0].click()", el)
-                    if self._key_press:
+                    if send_key:
                         time.sleep(0.3)
                         ActionChains(self.driver).send_keys(self._key_press).perform()
                         self.log(f"  ✓  clicked + key '{self._key_press}' on '{t}'", "OK")
+                        if self._key_press_verify:
+                            self._verify_playing_retry_key()
                     else:
                         self.log(f"  ✓  clicked '{t}'", "OK")
                 ok += 1
-                if scroll_px > 0 and not self._key_press:
+                if scroll_px > 0 and (
+                        (not self._key_press) or (self._key_press_last and is_last)):
                     time.sleep(0.5)
                     self.driver.execute_script(f"document.body.scrollBy(0, {scroll_px})")
                     self.log(f"  ↓  scrolled {scroll_px}px", "OK")
@@ -2712,7 +2851,46 @@ class App:
             except Exception as e:
                 self.log(f"  ✗  error '{t}': {e}", "ERROR")
             if delay_s > 0: time.sleep(delay_s)
+        if self._scroll_top_after:
+            try:
+                self.driver.execute_script(
+                    "window.scrollTo(0, 0); if (document.scrollingElement) document.scrollingElement.scrollTop = 0;")
+                self.log("  ↑  page scrolled back to the top", "OK")
+            except Exception:
+                pass
         return ok, len(targets)
+
+    def _video_playing(self):
+        """True if a <video> on the page is actually playing."""
+        try:
+            return bool(self.driver.execute_script("""
+                const vs = Array.from(document.querySelectorAll('video'));
+                return vs.some(v => !v.paused && !v.ended && v.readyState > 2);
+            """))
+        except Exception:
+            return False
+
+    def _verify_playing_retry_key(self, attempts=3, wait_s=3):
+        """After key_press: wait, check video plays; if not, send the key again.
+        Only resends when video is NOT playing, so it never pauses a running stream."""
+        for n in range(1, attempts + 1):
+            time.sleep(wait_s)
+            if self._video_playing():
+                self.log("  ▶  video playing ✓", "OK")
+                return True
+            self.log(f"  ⚠  video not playing — key '{self._key_press}' again "
+                     f"({n}/{attempts})", "WARN")
+            try:
+                ActionChains(self.driver).send_keys(self._key_press).perform()
+            except Exception as e:
+                self.log(f"  ✗  key resend failed: {e}", "ERROR")
+                return False
+        time.sleep(wait_s)
+        if self._video_playing():
+            self.log("  ▶  video playing ✓", "OK")
+            return True
+        self.log("  ✗  video still not playing after retries", "ERROR")
+        return False
 
     def _do_refresh(self):
         try:
