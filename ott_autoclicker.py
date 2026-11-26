@@ -2351,7 +2351,7 @@ class App:
         elif name:
             self.browser_var.set("Chrome")
         # browser size default per platform
-        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo", "Hotstar", "ESPN+ US"):
+        if name in ("SPOTV Now JP", "Disney+ AR", "Disney+ BR", "Fubo", "Hotstar", "ESPN+ US", "NBA Docomo"):
             self.browser_size_var.set("MD — 650×550")
         elif name in ("FanCode", "Stan"):
             self.browser_size_var.set("LG — 750×650")
