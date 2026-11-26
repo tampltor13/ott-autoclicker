@@ -2,6 +2,142 @@ OTT AutoClicker — Changelog
 ===========================
 
 
+v2.0.29 — AntiFreeze: "no video element" više ne loopa tiho zauvijek
+-----------------------------------------------------------------------
+- Prije: kad stranica nema video elementa, freeze loop je samo refreshao
+  svake minute beskonačno — bez alerta, bez eskalacije (npr. Peacock 26.10.)
+- Sada: nakon 3 uzastopna "nema video elementa" poziva _freeze_never_give_up
+  → čeka 2 min, šalje mail alert, nastavlja pokušavati do end timea
+- Log sada pokazuje brojač: "No video element found — refreshing… (1/3)"
+
+v2.0.28 — NBA Docomo: nikakav scroll, Space ostaje
+-----------------------------------------------------------------------
+- Za Docomo se stranica više NIGDJE ne pomiče (scroll_after = 0, uklonjen
+  i scroll na vrh)
+- Space ostaje: pokreće player kad video NE svira (prvo se klikne player,
+  pa Space ide playeru i ne scrolla stranicu). Ponovni pokušaji također
+  idu preko Spacea (maknut video.play() iz v2.0.27)
+- skip_if_playing ostaje: ako je klik na LIVE već pokrenuo stream, preskače
+  se klik na player i Space (inače bi pauzirali video koji svira).
+  Čeka se do 5 s da stream krene prije odluke.
+
+v2.0.27 — NBA Docomo: slika više ne "bježi" prema gore
+-----------------------------------------------------------------------
+- 19.11. (Hawks–Thunder): LIVE klik je odmah pokrenuo stream, ali zatim su
+  klik na player + Space + scroll 290px pomaknuli stranicu prema dolje,
+  pa je u W2C regiji ostala samo donja traka videa i komentari
+- Uklonjen scroll 290px za Docomo (novi player je na vrhu stranice)
+- skip_if_playing: ako video već svira nakon LIVE klika, preskače se
+  klik na player i Space
+- Ako video ne svira, ponovni pokušaj ide preko video.play() umjesto
+  drugog Spacea (Space bez fokusa na playeru scrolla stranicu)
+- scroll_top_after: na kraju se stranica uvijek vrati na vrh
+
+v2.0.26 — AntiFreeze nikad ne odustaje
+-----------------------------------------------------------------------
+- Prije: nakon 3 provjere s currentTime=0 AntiFreeze se trajno ugasio (⛔)
+  i stream je ostao stajati do kraja (npr. Prime UK 15.11. od 20:48)
+- Sada: umjesto gašenja čeka 2 min, pa opet refresh / remonitor,
+  i tako sve do kraja zadanog freeze vremena
+- Alert mail "❄ Stream keeps failing" (najviše jednom u 30 min),
+  isti SMTP kao pre-check alerti
+- Nove metode: _freeze_never_give_up(), _send_freeze_alert()
+
+v2.0.25 — Prime Video AU (Chrome)
+-----------------------------------------------------------------------
+- Nova platforma: Prime Video AU (https://www.primevideo.com)
+- Isti klikovi kao ostali Prime Video (circular-playbutton / play),
+  refresh_first, remonitor oporavak, scan offset 30 min
+- Default browser: Chrome
+- AntiFreeze uključen po defaultu
+- VPN pre-check: očekuje Australiju (AU)
+- Scan: Amazon parser sada čita i format s danom na početku
+  ("29 Jun 2026 3:10 PM AEDT", "15 November 2026 19:30") te australske
+  vremenske zone (AEDT/AEST/ACDT/ACST/AWST)
+
+v2.0.24 — NBA Docomo: AntiFreeze uključen + remonitor oporavak
+-----------------------------------------------------------------------
+- Freeze detection za NBA Docomo sada je uključen po defaultu
+- freeze_recovery: "remonitor" — nakon freeze refresha Docomo opet pokaže
+  LIVE gumb i sivi player, pa se ponovno pokreće cijeli slijed klikova:
+  refresh → klik LIVE → klik player → Space (s provjerom reprodukcije)
+- Nakon uspješnog klika AntiFreeze nastavlja pratiti (isto end vrijeme)
+
+v2.0.23 — NBA Docomo: provjera reprodukcije + ponovni Space
+-----------------------------------------------------------------------
+- Ponekad jedan Space nije dovoljan da live krene
+- Nakon Spacea program čeka 3s i provjeri svira li <video> (nije paused)
+- Ako ne svira → šalje Space ponovo (max 3 puta, svaki put provjera)
+- Space se šalje SAMO kad video ne svira — nikad ne pauzira stream koji radi
+- Novo polje u pravilima: key_press_verify (True = provjera + retry)
+- Nove metode: _video_playing(), _verify_playing_retry_key()
+
+v2.0.22 — NBA Docomo: klik na player + Space nakon LIVE gumba
+-----------------------------------------------------------------------
+- Nakon klika na "LIVEを再生" player se otvori pauziran (siv)
+- Dodan drugi target: //video-js | //video (klik na player)
+- Nakon klika na player šalje se Space → live kreće
+- Novo polje u pravilima: key_press_last (True = tipka se šalje samo
+  nakon ZADNJEG targeta, ne nakon svakog)
+- Scroll 290px ide nakon zadnjeg targeta (playera)
+- Slijed: refresh → 5s → klik LIVE → 2s → klik player → Space → scroll
+
+v2.0.21 — NBA Docomo: novi selector za "LIVEを再生" gumb + MD browser size
+-----------------------------------------------------------------------
+- Docomo je redizajnirao stranicu utakmice (/games/<id>): player (video-js)
+  više ne postoji dok se ne klikne gumb "LIVEを再生"
+- Novi target: //button[contains(normalize-space(.),"LIVEを再生")]
+- NBA Docomo default browser veličina promijenjena na MD (650×550)
+  (u v2.0.27 vraćeno na SM jer novi dizajn ima player na vrhu stranice)
+
+v2.0.20 — Edge driver: uklonjen msedgedriver, koristi Selenium Manager
+-----------------------------------------------------------------------
+- Uklonjena sva logika za lokalno traženje/preuzimanje/cachiranje msedgedriver.exe
+- Edge sada radi isto kao Chrome: Selenium Manager automatski upravljuje driverom
+- Na startu app automatski briše msedgedriver.exe iz app foldera ako postoji
+  (čisti stare verzije na svim PC-jevima pri prvom updateu)
+- Uklonjen webdriver-manager import blok (bio optional fallback, nije korišten)
+
+v2.0.19 — hide_controls_selector: sakrivanje video kontrola nakon klika
+-----------------------------------------------------------------------
+- Novi PLATFORM_RULES ključ: hide_controls_selector (CSS selector)
+- Nakon uspješnog klika, Selenium pomakne miš na taj element (van video area)
+- Playerova kontrolna traka se sakrije jer miš napusti video
+- Implementirano za SPOTV Now ID: cilja header/breadcrumb iznad videa
+- Može se dodati bilo kojoj platformi gdje controls ostaju vidljivi
+
+v2.0.18 — Nova platforma: SPOTV Now ID (Indonesia)
+-----------------------------------------------------------------------
+- Dodana platforma SPOTV Now ID (https://www.spotvnow.com/)
+- Razlikuje se od SPOTV Now JP (Japan, spotvnow.jp)
+- Default browser: Edge
+- targets: //button[@aria-label="Play"] — isti za monitoring i freeze recovery
+- freeze_recovery: refresh_only; freeze_live_selector: //button[@aria-label="Play"]
+  Nakon freeze refresha automatski klikne Play button
+- Freeze detection ON po defaultu
+
+v2.0.17 — Kayo Sports: freeze detection
+-----------------------------------------------------------------------
+- Kayo Sports dodan u freeze-detection-default-ON listu
+- Nakon freeze refresha, _freeze_try_join_live() automatski klikne id="joinLive"
+  (isti mehanizam kao DAZN — Kayo koristi identičan id na Join Live buttonu)
+
+v2.0.16 — Nova platforma: Kayo Sports
+-----------------------------------------------------------------------
+- Dodana platforma Kayo Sports (https://kayosports.com.au/)
+- Button: //button[@data-test-id="join-live-button"] (id="joinLive", isti kao DAZN)
+- refresh_first: True — refresha stranicu dok se ne pojavi "Join Live" button
+- click_delay: 3s, load_wait: 35s (spor VPN/internet)
+- Default browser: Chrome
+
+v2.0.15 — Peacock: Ingrid profil kao prvi click target
+-----------------------------------------------------------------------
+- Profile chooser ("Who's watching?") zna se pojaviti umjesto event stranice pri svakom refreshu
+- Ingrid XPath dodan kao PRVI target — ako se pojavi, klikne se (3s delay), pa watch-button
+- Ako Ingrid nije prisutan (normalan slučaj), timeout i direktno na watch-button
+- Uklonjeni freeze_profile_selector i freeze_live_selector — targets lista sada pokriva oba scenarija
+- click_delay 3s osigurava da se profil učita između dva klika
+
 v2.0.14 — Peacock: freeze_live_selector + wait nakon profile clicka + click_delay 3s
 -----------------------------------------------------------------------
 - Dodano freeze_live_selector za Peacock: //*[@data-testid="watch-button"]
